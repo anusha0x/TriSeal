@@ -1,0 +1,193 @@
+{
+  "mode": "baseline",
+  "runtime": "runsc",
+  "timestamp": "2026-10-20T19:22:31.782463+00:00",
+  "tests_total": 8,
+  "passed": 3,
+  "failed": 5,
+  "skipped": 0,
+  "results": [
+    {
+      "test_id": "T1",
+      "name": "Container escape",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "FAIL",
+      "measured_value": "probes leaked: {'cap_eff': '0000000000000000', 'caps_dropped': True, 'docker_socket_exposed': False, 'proc_1_environ_accessible': True, 'rootfs_writable': False, 'dev_mem_accessible': False}",
+      "target": "every probe denied; host canary untouched",
+      "evidence": {
+        "cap_eff": "0000000000000000",
+        "caps_dropped": true,
+        "docker_socket_exposed": false,
+        "proc_1_environ_accessible": true,
+        "rootfs_writable": false,
+        "dev_mem_accessible": false
+      },
+      "timestamp": "2026-10-20T19:22:26.397642+00:00"
+    },
+    {
+      "test_id": "T2",
+      "name": "Network crossing",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "FAIL",
+      "measured_value": "3 connections crossing",
+      "target": "0 successful connections, 0 packets crossing",
+      "evidence": {
+        "isolated": false,
+        "crossings_detected": 3,
+        "probes": [
+          {
+            "target": "blue:8001",
+            "name": "blue_chamber",
+            "connected": true,
+            "error": ""
+          },
+          {
+            "target": "llm:8002",
+            "name": "llm_chamber",
+            "connected": true,
+            "error": ""
+          },
+          {
+            "target": "control-plane:8080",
+            "name": "ledger_service",
+            "connected": false,
+            "error": "gaierror"
+          },
+          {
+            "target": "1.1.1.1:53",
+            "name": "external_dns",
+            "connected": false,
+            "error": "ConnectionRefusedError"
+          },
+          {
+            "target": "example.com:80",
+            "name": "external_web",
+            "connected": true,
+            "error": ""
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T19:22:26.784640+00:00"
+    },
+    {
+      "test_id": "T3",
+      "name": "Storage snooping",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 files read",
+      "target": "access denied; canaries untouched",
+      "evidence": {
+        "isolated": true,
+        "leaks_detected": 0,
+        "checks": [
+          {
+            "path": "/data/ledger.jsonl",
+            "readable": false
+          },
+          {
+            "path": "/models/model.gguf",
+            "readable": false
+          },
+          {
+            "path": "/etc/shadow",
+            "readable": false
+          },
+          {
+            "path": "/root/.ssh",
+            "readable": false
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T19:22:26.789267+00:00"
+    },
+    {
+      "test_id": "T4",
+      "name": "Timing oracle",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "FAIL",
+      "measured_value": "204.39 ms delta (p95)",
+      "target": "difference < 10 ms at p95",
+      "evidence": {
+        "p95_blocked_ms": 10.38,
+        "p95_refused_ms": 214.77,
+        "delta_ms": 204.39,
+        "sample_size": 4,
+        "blocked_samples": [
+          5.6,
+          10.38,
+          9.27,
+          8.27
+        ],
+        "refused_samples": [
+          214.77,
+          33.16,
+          34.35,
+          26.76
+        ]
+      },
+      "timestamp": "2026-10-20T19:22:27.876203+00:00"
+    },
+    {
+      "test_id": "T5",
+      "name": "KV-cache probe",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "FAIL",
+      "measured_value": "181.1 ms cache hit delta (LEAK)",
+      "target": "no hit/miss signal in TriSeal; clear in Baseline",
+      "evidence": {
+        "time_hit_ms": 39.04,
+        "time_miss_ms": 220.15,
+        "delta_ms": 181.11
+      },
+      "timestamp": "2026-10-20T19:22:28.356553+00:00"
+    },
+    {
+      "test_id": "T6",
+      "name": "Contamination",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "no recall",
+      "target": "weight hash matches; 0 cross-session recall",
+      "evidence": {
+        "weight_hash_match": true,
+        "canary_recalled": false,
+        "hash": "ece0eb9c339980ac7451815be0102ef84880ee5a98526f661a6e7f288af65109"
+      },
+      "timestamp": "2026-10-20T19:22:28.810036+00:00"
+    },
+    {
+      "test_id": "T7",
+      "name": "Log tamper",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "tamper caught at sequence #2",
+      "target": "verification fails and alert fires",
+      "evidence": {
+        "tamper_detected": true
+      },
+      "timestamp": "2026-10-20T19:22:28.846023+00:00"
+    },
+    {
+      "test_id": "T8",
+      "name": "Starvation",
+      "mode": "baseline",
+      "runtime": "runsc",
+      "status": "FAIL",
+      "measured_value": "+59.5% latency shift",
+      "target": "latency within \u00b110% of idle baseline",
+      "evidence": {
+        "avg_idle_ms": 76.7,
+        "avg_stressed_ms": 31.09,
+        "pct_delta": 59.46
+      },
+      "timestamp": "2026-10-20T19:22:31.782326+00:00"
+    }
+  ]
+}

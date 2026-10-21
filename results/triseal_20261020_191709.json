@@ -1,0 +1,205 @@
+{
+  "mode": "triseal",
+  "runtime": "runsc",
+  "timestamp": "2026-10-20T19:17:09.718704+00:00",
+  "tests_total": 8,
+  "passed": 7,
+  "failed": 1,
+  "skipped": 0,
+  "results": [
+    {
+      "test_id": "T1",
+      "name": "Container escape",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 probes allowed",
+      "target": "every probe denied; host canary untouched",
+      "evidence": {
+        "cap_eff": "0000000000000000",
+        "caps_dropped": true,
+        "docker_socket_exposed": false,
+        "host_proc_1_environ_accessible": false,
+        "rootfs_writable": false,
+        "dev_mem_accessible": false
+      },
+      "timestamp": "2026-10-20T19:15:53.922223+00:00"
+    },
+    {
+      "test_id": "T2",
+      "name": "Network crossing",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 connections crossing",
+      "target": "0 successful connections, 0 packets crossing",
+      "evidence": {
+        "isolated": true,
+        "crossings_detected": 0,
+        "probes": [
+          {
+            "target": "blue:8001",
+            "name": "blue_chamber",
+            "connected": false,
+            "error": "gaierror"
+          },
+          {
+            "target": "llm:8002",
+            "name": "llm_chamber",
+            "connected": false,
+            "error": "gaierror"
+          },
+          {
+            "target": "172.28.2.20:8001",
+            "name": "blue_chamber_ip",
+            "connected": false,
+            "error": "TimeoutError"
+          },
+          {
+            "target": "172.28.3.20:8002",
+            "name": "llm_chamber_ip",
+            "connected": false,
+            "error": "TimeoutError"
+          },
+          {
+            "target": "control-plane:8080",
+            "name": "ledger_service",
+            "connected": false,
+            "error": "gaierror"
+          },
+          {
+            "target": "1.1.1.1:53",
+            "name": "external_dns",
+            "connected": false,
+            "error": "ConnectionRefusedError"
+          },
+          {
+            "target": "example.com:80",
+            "name": "external_web",
+            "connected": false,
+            "error": "gaierror"
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T19:15:55.222555+00:00"
+    },
+    {
+      "test_id": "T3",
+      "name": "Storage snooping",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 files read",
+      "target": "access denied; canaries untouched",
+      "evidence": {
+        "isolated": true,
+        "leaks_detected": 0,
+        "checks": [
+          {
+            "path": "/data/ledger.jsonl",
+            "readable": false
+          },
+          {
+            "path": "/models/model.gguf",
+            "readable": false
+          },
+          {
+            "path": "/etc/shadow",
+            "readable": false
+          },
+          {
+            "path": "/root/.ssh",
+            "readable": false
+          }
+        ]
+      },
+      "timestamp": "2026-10-20T19:15:55.228968+00:00"
+    },
+    {
+      "test_id": "T4",
+      "name": "Timing oracle",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "FAIL",
+      "measured_value": "80.87 ms delta (p95)",
+      "target": "difference < 5 ms at p95",
+      "evidence": {
+        "p95_blocked_ms": 3596.84,
+        "p95_refused_ms": 3515.97,
+        "delta_ms": 80.87,
+        "sample_size": 4,
+        "blocked_samples": [
+          3596.84,
+          3513.85,
+          3515.48,
+          3520.46
+        ],
+        "refused_samples": [
+          3512.62,
+          3515.97,
+          3514.77,
+          3510.21
+        ]
+      },
+      "timestamp": "2026-10-20T19:16:21.434293+00:00"
+    },
+    {
+      "test_id": "T5",
+      "name": "KV-cache probe",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "6.5 ms delta (flat)",
+      "target": "no hit/miss signal in TriSeal; clear in Baseline",
+      "evidence": {
+        "time_hit_ms": 3519.61,
+        "time_miss_ms": 3513.08,
+        "delta_ms": 6.53
+      },
+      "timestamp": "2026-10-20T19:16:31.989010+00:00"
+    },
+    {
+      "test_id": "T6",
+      "name": "Contamination",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "hash match, 0 recall",
+      "target": "weight hash matches; 0 cross-session recall",
+      "evidence": {
+        "weight_hash_match": true,
+        "canary_recalled": false,
+        "hash": "ece0eb9c339980ac7451815be0102ef84880ee5a98526f661a6e7f288af65109"
+      },
+      "timestamp": "2026-10-20T19:16:39.067834+00:00"
+    },
+    {
+      "test_id": "T7",
+      "name": "Log tamper",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "tamper caught at sequence #2",
+      "target": "verification fails and alert fires",
+      "evidence": {
+        "tamper_detected": true
+      },
+      "timestamp": "2026-10-20T19:16:39.099170+00:00"
+    },
+    {
+      "test_id": "T8",
+      "name": "Starvation",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "\u00b10.0% latency variance",
+      "target": "latency within \u00b110% of idle baseline",
+      "evidence": {
+        "avg_idle_ms": 3513.7,
+        "avg_stressed_ms": 3512.98,
+        "pct_delta": 0.02
+      },
+      "timestamp": "2026-10-20T19:17:09.718587+00:00"
+    }
+  ]
+}

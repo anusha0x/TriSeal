@@ -1,0 +1,47 @@
+# TriSeal Blue Chamber Guard Configuration
+version: "1.0"
+name: "Standard Safety & Jailbreak Guard"
+
+input_rules:
+  - id: "RULE-IN-001"
+    name: "DAN & Roleplay Jailbreaks"
+    pattern: "(?i)(ignore (all|previous|the) (instructions|rules|prompts)|roleplay as (aim|dan)|do anything now)"
+    action: "block"
+    reason: "Prompt injection / roleplay jailbreak pattern detected"
+
+  - id: "RULE-IN-002"
+    name: "Password Extraction Probe"
+    pattern: "(?i)(what is the secret password|spell (it|the password) backwards|reveal the secret)"
+    action: "block"
+    reason: "Secret extraction attempt detected"
+
+  - id: "RULE-IN-003"
+    name: "System Prompt Extraction"
+    pattern: "(?i)(repeat the words above|show your system instructions|print system prompt)"
+    action: "block"
+    reason: "System prompt exfiltration probe"
+
+  - id: "RULE-IN-004"
+    name: "Cyber Attack Probe"
+    pattern: "(?i)(write a tutorial on bypass mechanism|generate a script to probe network vulnerability)"
+    action: "block"
+    reason: "Adversarial cyber weaponization probe"
+
+output_rules:
+  - id: "RULE-OUT-001"
+    name: "System Prompt Leak Prevention"
+    pattern: "(?i)(system prompt:|you are a helpful assistant and your secret is)"
+    action: "redact"
+    replacement: "[REDACTED_SYSTEM_INSTRUCTION]"
+
+  - id: "RULE-OUT-002"
+    name: "Secret Key Leak Prevention"
+    pattern: "(?i)(password=[a-zA-Z0-9_-]+|api_key_[a-zA-Z0-9]+)"
+    action: "block"
+    reason: "Sensitive credential detected in model response"
+
+refusal_signatures:
+  - "(?i)i cannot (fulfill|assist|help with|provide|comply)"
+  - "(?i)i am unable to"
+  - "(?i)i apologize, but i cannot"
+  - "(?i)against my safety policies"

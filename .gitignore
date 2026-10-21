@@ -1,0 +1,40 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Cryptographic Keys & Secrets
+*.key
+*.pem
+keys/
+**/keys/
+secrets/
+**/secrets/
+*ledger_ed25519*
+data/
+**/data/
+
+# Dependencies & Build artifacts
+node_modules/
+ui/dist/
+ui/node_modules/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Models & Datasets (fetchable via scripts)
+models/
+datasets/
+*.gguf
+chambers/red/datasets/
+chambers/llm/models/
+chambers/llm/bin/
+
+# Temporary & Test files
+results/*.tmp
+data/*.jsonl
+*.log
