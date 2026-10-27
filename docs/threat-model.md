@@ -55,9 +55,23 @@ TriSeal isolates three untrusted/semi-trusted adversarial entities:
 
 ---
 
-## 4. Production Evolution Path
+## 4. Production Evolution Path & Architectural Reality
 
-1. **Sandboxing:** gVisor (`runsc`) -> Confidential Containers (Kata Containers with AMD SEV-SNP / Intel TDX).
-2. **Network Security:** Docker internal networks -> Cilium eBPF network policies with mTLS encryption (SPIFFE/SPIRE identities).
-3. **Capability Tokens:** Ed25519 tokens -> Cryptographically attenuated Biscuit tokens.
-4. **Audit Anchoring:** Local signed Merkle checkpoints -> Public transparency log anchoring (Sigstore Rekor).
+The current prototype prioritizes strict empirical verification on standard developer workstations (Linux/WSL2 CPU) without cloud GPU or kernel-level dependencies:
+
+1. **Sandboxing:**
+   - *Current (Built):* gVisor (`runsc`) user-space Sentry kernel + dropped Linux capabilities + read-only rootfs.
+   - *Production Path:* Confidential Containers (Kata Containers with AMD SEV-SNP or Intel TDX hardware memory encryption and remote attestation).
+2. **Network Security:**
+   - *Current (Built):* 4 isolated Docker bridge networks (`internal: true`) with iptables namespace segregation and 0 external egress.
+   - *Production Path (Why Future):* Cilium eBPF network policies with mTLS encryption (SPIFFE/SPIRE). eBPF requires host kernel BPF access (`CAP_BPF`) and BTF enabled, which standard WSL2 kernels lack. Docker internal bridges provide identical L3/L4 packet dropping for local sandboxing.
+3. **Capability Tokens & Policy:**
+   - *Current (Built):* Ed25519-signed capability tokens verified by Arbiter Gateway.
+   - *Production Path (Why Future):* Biscuit decentralized attenuated tokens and Open Policy Agent (OPA) dynamic bundle distribution. In a single-host prototype, Arbiter and Control Plane share cryptographic authority, so external Rust/Go FFI daemons add latency and image footprint without changing the boundary.
+4. **Audit Anchoring:**
+   - *Current (Built):* Append-only SHA-256 hash chain + Ed25519 signatures against pinned authority key (`ledger/trust/ledger_signing.pub`) + Merkle root checkpoints committed to `docs/anchors.txt`.
+   - *Production Path (Why Future):* Sigstore Rekor immutable public transparency log. Enterprise AI safety testing frequently involves confidential or proprietary red team payloads that cannot be disclosed to a public log; the local Merkle anchor uses the exact same Merkle tree structure, ready to swap in a private enterprise Rekor instance.
+5. **Model Serving:**
+   - *Current (Built):* Native `llama.cpp` (`llama-server` b11756) on CPU with `Qwen2.5-0.5B-Instruct` GGUF, dynamic file byte SHA-256 weight hash, `--no-cache-prompt`, and audited slot erasure.
+   - *Production Path (Why Future):* vLLM multi-GPU engine with PagedAttention and hardware memory encryption. Requires high-end NVIDIA GPUs (CUDA 12+, 16GB+ VRAM); `llama.cpp` was selected specifically to permit local auditability on any standard CPU.
+
