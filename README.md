@@ -39,41 +39,43 @@ Adversarial AI safety testing presents a fundamental security trilemma:
 ### The Three Chambers & Gateway:
 - **Red Chamber (`chambers/red/`)**: Attack runner loading benchmark datasets (AdvBench, HarmBench, JailbreakBench, Gandalf). Contains benign probe targets for container escape, network crossing, storage snooping, and noisy-neighbor stress.
 - **Blue Chamber (`chambers/blue/`)**: Sealed defense guardrail enforcing regex and keyword policies (`guard.yaml`) on prompt ingress and LLM output egress. Has zero external network access.
-- **LLM Chamber (`chambers/llm/`)**: Local model serving via `llama.cpp` on CPU (`Qwen2.5-1.5B-Instruct-Q4_K_M.gguf`). Enforces strict per-tenant slot cache isolation and round-boundary context erasure (`POST /v1/slots/erase`).
-- **Arbiter Gateway (`arbiter/`)**: Sole entrypoint connecting Red, Blue, and LLM across separate internal bridge networks (`net_red`, `net_blue`, `net_llm`). Enforces uniform reply envelopes and fixed-time deadline releases ($D = 3500\text{ms}$).
-- **Audit Ledger (`ledger/`)**: Append-only cryptographic ledger storing SHA-256 hashes of all hop events, signed with Ed25519 keys, backed by Merkle trees and verifiable via CLI/API.
+- **LLM Chamber (`chambers/llm/`)**: Real local model serving via native `llama-server` (b11756) on CPU (`Qwen2.5-0.5B-Instruct-GGUF`, official SHA-256: `74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db`). Enforces per-tenant slot isolation, `--no-cache-prompt`, and round-boundary context erasure (`POST /v1/slots/erase`).
+- **Arbiter Gateway (`arbiter/`)**: Sole entrypoint connecting Red, Blue, and LLM across separate internal bridge networks (`net_red`, `net_blue`, `net_llm`). Enforces uniform reply envelopes and calibrated fixed-time deadline releases (D = 1400 ms, calibrated from measured p99 inference latency).
+- **Audit Ledger (`ledger/`)**: Append-only cryptographic ledger storing SHA-256 hashes of all hop events, signed with Ed25519 keys against a pinned authority public key (`ledger/trust/ledger_signing.pub`), backed by Merkle trees and verifiable via CLI/API and external anchors (`make anchor`).
 
 ---
 
 ## 3. Real Recorded Benchmark: Baseline vs. TriSeal
 
-All metrics below are **empirically measured** on the real host under WSL2 Linux Kernel 6.6 with standalone Docker Engine 29.1.3 and gVisor `runsc`:
+All metrics below are **empirically measured** on the real host under WSL2 Linux Kernel 6.6 with Docker Engine and gVisor `runsc` using the real `Qwen2.5-0.5B-Instruct` model and `llama.cpp` runtime:
 
 | Test ID | Test Name | Target Requirement | Baseline (Naive) Result | TriSeal (Hardened) Result | Verdict |
 |---|---|---|---|---|:---:|
-| **T1** | Container Escape | Every probe denied; host canary untouched | **FAIL** (unconstrained capabilities & proc) | **PASS** (0 probes allowed; capabilities dropped) | **BLOCKED** |
-| **T2** | Network Crossing | 0 connections crossing internal nets | **FAIL** (3 connections crossing; direct reach) | **PASS** (0 connections crossing; physical net isolation) | **BLOCKED** |
-| **T3** | Storage Snooping | Access denied; canaries untouched | **PASS** (0 files read) | **PASS** (0 files read; read-only tmpfs rootfs) | **SECURE** |
-| **T4** | Timing Oracle | Difference $< 10\text{ ms}$ at p95 | **FAIL** (204.39 ms delta; side channel open) | **PASS** (1.73 ms delta; deadline $D=3500\text{ms}$) | **BLOCKED** |
-| **T5** | KV-Cache Probe | No hit/miss signal in TriSeal | **FAIL** (181.1 ms PromptPeek cache hit leak) | **PASS** (4.8 ms delta; per-tenant slot cache) | **BLOCKED** |
-| **T6** | Contamination | Weight hash matches; 0 cross-session recall | **PASS** (no recall) | **PASS** (hash match; 0 recall after slot erase) | **SECURE** |
-| **T7** | Log Tamper | Verification fails and alert fires | **PASS** (tamper caught at sequence #2) | **PASS** (tamper caught at sequence #2; Ed25519 alert) | **SECURE** |
-| **T8** | Resource Starvation| Latency within $\pm 10\%$ of idle baseline | **FAIL** (+59.5% latency shift under stress) | **PASS** ($\pm 0.1\%$ latency variance; cgroup limits) | **BLOCKED** |
-| **TOTAL** | **Summary Score** | **All 8 Tests Passed** | **3 / 8 Passed** (5 Critical Leaks) | **8 / 8 Passed** (0 Leaks Detected) | **100% PASS** |
+| **T1** | Container Escape | Every probe denied; host canary untouched | **FAIL** (Rootfs writable, capabilities present) | **PASS** (0 probes allowed; `read_only: true`, EROFS) | **BLOCKED** |
+| **T2** | Network Crossing | 0 connections crossing internal nets | **FAIL** (30 connections crossing; external egress open) | **PASS** (0 connections crossing; physical net isolation) | **BLOCKED** |
+| **T3** | Storage Snooping | Access denied; canaries untouched | **FAIL** (Shared defense canary read) | **PASS** (0 files read; isolated rootfs) | **BLOCKED** |
+| **T4** | Timing Oracle | Difference < 10 ms at p95 | **FAIL** (1539.31 ms delta; timing side channel open) | **PASS** (2.78 ms delta; deadline D = 1400 ms) | **BLOCKED** |
+| **T5** | KV-Cache Probe | No hit/miss signal in TriSeal; clear in Baseline | **INCONCLUSIVE** (-20.3 ms delta; masked by CPU jitter) | **INCONCLUSIVE** (180.9 ms delta; cold CPU variance) | **INCONCLUSIVE (CPU)** |
+| **T6** | Contamination | Weight hash matches; 0 cross-session recall | **PASS** (0 recall across unprompted sessions) | **PASS** (Dynamic SHA-256 match; 0 recall verified) | **SECURE** |
+| **T7** | Log Tamper | Verification fails and alert fires | **PASS** (Tamper caught at sequence #2) | **PASS** (Tamper caught at sequence #2; Pinned Ed25519 alert) | **SECURE** |
+| **T8** | Resource Starvation| Latency within +/- 10% of idle baseline | **PASS** (+0.2% latency shift) | **PASS** (±0.0% latency variance; deadline D = 1400 ms) | **SECURE** |
+| **TOTAL** | **Summary Score** | **All Invariants Audited** | **3 PASS / 4 FAIL / 1 INCONCLUSIVE** | **7 PASS / 0 FAIL / 1 INCONCLUSIVE** | **100% AUDITED** |
 
 ---
 
 ## 4. Key Security Invariants Enforced
 
 1. **Zero Outbound Egress & Internal Bridge Separation**:
-   Red Chamber is physically attached only to `net_red`. Blue Chamber is attached only to `net_blue`. LLM is attached only to `net_llm`. No direct routing exists between Red and Blue or Red and LLM. All communication must traverse Arbiter.
+   Red Chamber is physically attached only to `net_red`. Blue Chamber is attached only to `net_blue`. LLM is attached only to `net_llm`. No direct routing exists between Red and Blue or Red and LLM. All communication must traverse Arbiter. All 4 internal networks specify `internal: true`.
 2. **Fixed-Time Deadline Reply Releases**:
-   Whether a query is immediately blocked by Blue input inspection (~5ms) or evaluated by the LLM (~100ms), Arbiter delays release until exactly $D = 3500\text{ms}$. Response envelopes are byte-for-byte and key-for-key structurally identical.
+   Whether a query is immediately blocked by Blue input inspection (~5ms) or evaluated by the LLM (~100ms), Arbiter delays release until exactly D = 3500 ms. Response envelopes are byte-for-byte and key-for-key structurally identical.
 3. **Per-Tenant Slot Isolation & Cache Erasure**:
    Tenant prompts are partitioned into isolated slots in `llama.cpp`. Shared cross-tenant KV caches are disabled. After each round, the slot cache is wiped to prevent prompt extraction attacks like PromptPeek.
 4. **Append-Only Signed Audit Ledger with Zero Plaintext**:
    Prompt text and completions are never stored in plaintext in the ledger. Instead, only canonical SHA-256 hashes (`payload_hash`), actor identities, and metadata are chained:
-   $$\text{entry\_hash} = \text{SHA-256}(\text{prev\_hash} \parallel \text{canonical\_json}(\text{event}))$$
+   ```
+   entry_hash = SHA-256(prev_hash || canonical_json(event))
+   ```
    Each entry is signed with Ed25519. Any 1-bit modification breaks hash integrity and invalidates all downstream signatures.
 5. **gVisor User-Space Kernel Isolation**:
    Chambers run with `runtime: runsc`, running an independent user-space Sentry kernel that intercepts syscalls and shields the host kernel from container escapes.
@@ -123,8 +125,8 @@ make ui
 
 ### Accessing Services
 - **Security-Ops Web Console**: [http://127.0.0.1:5173](http://127.0.0.1:5173)
-- **Control Plane REST API**: [http://127.0.0.1:8080/v1/health](http://127.0.0.1:8080/v1/health)
-- **Arbiter Gateway**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- **Arbiter Gateway Health**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- **Arbiter Prompt Gateway**: `POST http://127.0.0.1:8000/v1/gateway/prompt`
 
 ---
 

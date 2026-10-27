@@ -101,3 +101,56 @@ def test_merkle_tree_proof():
     for i in range(len(hashes)):
         proof = tree.get_proof(i)
         assert MerkleTree.verify_proof(hashes[i], proof, root) is True
+
+def test_ledger_rejects_untrusted_signing_key(tmp_ledger, tmp_path):
+    ledger_file, cp_file = tmp_ledger
+    chain = LedgerChain(str(ledger_file), str(cp_file), checkpoint_interval=5)
+    for i in range(3):
+        chain.append("r1", "red", "STEP", {"data": i})
+
+    # Legitimate key
+    trusted_key_file = tmp_path / "trusted.pub"
+    trusted_key_file.write_text(chain.key_manager.public_key_hex)
+
+    # Verifier with legitimate pinned key passes
+    v_good = LedgerVerifier(str(ledger_file), str(cp_file), trusted_pub_key_path=str(trusted_key_file))
+    assert v_good.verify_chain()["valid"] is True
+
+    # Pinned rogue key
+    rogue_key_file = tmp_path / "rogue.pub"
+    rogue_km = KeyManager(str(tmp_path / "rogue_keys"))
+    rogue_key_file.write_text(rogue_km.public_key_hex)
+
+    # Verifier with rogue key rejects chain signed by original key
+    v_bad = LedgerVerifier(str(ledger_file), str(cp_file), trusted_pub_key_path=str(rogue_key_file))
+    res_bad = v_bad.verify_chain()
+    assert res_bad["valid"] is False
+    assert "Untrusted public key" in res_bad["reason"]
+
+def test_ledger_external_anchors(tmp_ledger, tmp_path):
+    ledger_file, cp_file = tmp_ledger
+    chain = LedgerChain(str(ledger_file), str(cp_file), checkpoint_interval=5)
+    for i in range(5):
+        chain.append("r1", "red", "STEP", {"data": i})
+
+    anchor_file = tmp_path / "anchors.txt"
+    trusted_key_file = tmp_path / "trusted.pub"
+    trusted_key_file.write_text(chain.key_manager.public_key_hex)
+
+    # Create anchor utility
+    from ledger.anchor import create_anchor
+    anchor_rec = create_anchor(str(ledger_file), str(cp_file), str(anchor_file))
+    assert anchor_rec is not None
+    assert anchor_rec["seq"] == 4
+
+    verifier = LedgerVerifier(str(ledger_file), str(cp_file), trusted_pub_key_path=str(trusted_key_file), anchor_file=str(anchor_file))
+    res = verifier.verify_anchors()
+    assert res["valid"] is True
+    assert res["anchors_verified"] == 1
+
+    # Tamper with anchor file
+    anchor_file.write_text("2026-10-27T00:00:00Z | seq:4 | root:0000000000000000000000000000000000000000000000000000000000000000 | hash:1111111111111111111111111111111111111111111111111111111111111111\n")
+    res_bad = verifier.verify_anchors()
+    assert res_bad["valid"] is False
+    assert "External anchor mismatch" in res_bad["reason"]
+

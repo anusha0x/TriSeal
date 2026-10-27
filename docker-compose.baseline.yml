@@ -12,6 +12,8 @@ services:
       - LLM_URL=http://llm:8002
       - REPLY_DEADLINE_MS=0
       - LEDGER_DIR=/tmp/data
+    volumes:
+      - ./data/keys:/app/data/keys:ro
     networks:
       - net_shared
 
@@ -26,6 +28,8 @@ services:
       - MODE=baseline
     networks:
       - net_shared
+    volumes:
+      - ./data/baseline_shared:/data/shared
 
   llm:
     build:
@@ -36,6 +40,9 @@ services:
       - "127.0.0.1:8002:8002"
     environment:
       - MODE=baseline
+      - MODEL_PATH=/models/model.gguf
+    volumes:
+      - ./chambers/llm/models/model.gguf:/models/model.gguf:ro
     networks:
       - net_shared
 
@@ -51,6 +58,8 @@ services:
       - ARBITER_URL=http://arbiter:8000
     networks:
       - net_shared
+    volumes:
+      - ./data/baseline_shared:/data/shared
 
 networks:
   net_shared:

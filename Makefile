@@ -2,7 +2,7 @@ SHELL := /bin/bash
 MODE ?= triseal
 CHAMBER_RUNTIME ?= runc
 
-.PHONY: help setup fetch-model fetch-datasets up down ps logs test-baseline test-triseal test-all verify-ledger tamper-demo ui clean
+.PHONY: help setup fetch-model fetch-datasets up down ps logs test-baseline test-triseal test-all verify-ledger tamper-demo ui clean control-plane anchor demo
 
 help:
 	@echo "TriSeal Management Commands:"
@@ -55,16 +55,30 @@ test-baseline:
 test-triseal:
 	python3 -m tests.leaksuite.runner --mode triseal
 
-test-all: test-baseline test-triseal
+test-all:
+	@echo "=== [1/2] Running Baseline Leaksuite ==="
+	docker compose -f docker-compose.triseal.yml down -v --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.baseline.yml up -d
+	sleep 8
+	python3 -m tests.leaksuite.runner --mode baseline
+	@echo "=== [2/2] Running TriSeal Leaksuite ==="
+	docker compose -f docker-compose.baseline.yml down -v --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.triseal.yml up -d
+	sleep 8
+	python3 -m tests.leaksuite.runner --mode triseal
 
 verify-ledger:
-	python3 -m ledger.verifier --ledger-file data/ledger.jsonl
+	python3 -m ledger.verifier --ledger-file data/ledger.jsonl --checkpoints data/checkpoints.jsonl --trusted-key ledger/trust/ledger_signing.pub --anchor-file docs/anchors.txt
 
-tamper-demo:
-	python3 -m ledger.tamper_demo
+anchor:
+	python3 -m ledger.anchor
 
 demo:
 	bash scripts/demo.sh
 
+control-plane:
+	PYTHONPATH=. python3 -m uvicorn server:app --app-dir control-plane --host 0.0.0.0 --port 8080
+
 ui:
 	cd ui && npm run dev
+

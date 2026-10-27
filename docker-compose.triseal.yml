@@ -12,7 +12,7 @@ services:
       - CHAMBER_RUNTIME=${CHAMBER_RUNTIME:-runsc}
       - BLUE_URL=http://blue:8001
       - LLM_URL=http://llm:8002
-      - REPLY_DEADLINE_MS=${REPLY_DEADLINE_MS:-3500}
+      - REPLY_DEADLINE_MS=${REPLY_DEADLINE_MS:-1400}
       - LEDGER_DIR=/tmp/data
     cap_drop:
       - ALL
@@ -21,8 +21,11 @@ services:
     pids_limit: 128
     mem_limit: 1g
     cpus: 2.0
+    read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      - ./data/keys:/app/data/keys:ro
     networks:
       net_red:
         ipv4_address: 172.28.1.10
@@ -53,6 +56,7 @@ services:
     pids_limit: 128
     mem_limit: 1g
     cpus: 2.0
+    read_only: true
     tmpfs:
       - /tmp
     networks:
@@ -70,6 +74,9 @@ services:
     environment:
       - MODE=triseal
       - CHAMBER_RUNTIME=${CHAMBER_RUNTIME:-runsc}
+      - MODEL_PATH=/models/model.gguf
+    volumes:
+      - ./chambers/llm/models/model.gguf:/models/model.gguf:ro
     cap_drop:
       - ALL
     security_opt:
@@ -77,6 +84,7 @@ services:
     pids_limit: 128
     mem_limit: 2g
     cpus: 2.0
+    read_only: true
     tmpfs:
       - /tmp
     networks:
@@ -104,13 +112,12 @@ services:
     pids_limit: 128
     mem_limit: 1g
     cpus: 2.0
+    read_only: true
     tmpfs:
       - /tmp
     networks:
       net_red:
         ipv4_address: 172.28.1.20
-      net_admin:
-        ipv4_address: 172.28.4.20
     extra_hosts:
       - "arbiter:172.28.1.10"
 
@@ -135,6 +142,7 @@ networks:
         - subnet: 172.28.3.0/24
   net_admin:
     driver: bridge
+    internal: true
     ipam:
       config:
         - subnet: 172.28.4.0/24

@@ -1,48 +1,112 @@
 import os
+import sys
 import time
 import json
 import hashlib
+import asyncio
+import subprocess
+import urllib.request
+import urllib.error
 from pathlib import Path
 from typing import Dict, Any, Optional, List
-from fastapi import FastAPI, HTTPException, Request
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-app = FastAPI(title="TriSeal LLM Chamber - Model Serving & KV-Cache Isolation")
-
 MODE = os.environ.get("MODE", "triseal").lower()  # "baseline" or "triseal"
-MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/tmp/models"))
-MODELS_DIR.mkdir(parents=True, exist_ok=True)
-MODEL_FILE = MODELS_DIR / "model.gguf"
-HASH_FILE = MODELS_DIR / "model.sha256"
+MODEL_PATH = Path(os.environ.get("MODEL_PATH", "/models/model.gguf"))
+if not MODEL_PATH.exists():
+    # Local fallback for development outside docker
+    alt = Path(__file__).parent / "models" / "model.gguf"
+    if alt.exists():
+        MODEL_PATH = alt
 
-# Ensure hash file exists
-if not HASH_FILE.exists():
-    if MODEL_FILE.exists():
-        h = hashlib.sha256(MODEL_FILE.read_bytes()).hexdigest()
-        HASH_FILE.write_text(h)
+# 1. Compute real SHA-256 weight hash from file bytes at startup
+def compute_weight_hash(path: Path) -> str:
+    if not path.exists():
+        return "MODEL_NOT_FOUND"
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(65536):
+            h.update(chunk)
+    return h.hexdigest()
+
+REAL_WEIGHT_HASH = compute_weight_hash(MODEL_PATH)
+REAL_FILE_SIZE = MODEL_PATH.stat().st_size if MODEL_PATH.exists() else 0
+print(f"[LLM Chamber] Mode: {MODE}")
+print(f"[LLM Chamber] Model: {MODEL_PATH} ({REAL_FILE_SIZE} bytes)")
+print(f"[LLM Chamber] Real Weight SHA-256: {REAL_WEIGHT_HASH}")
+
+# 2. llama-server process lifecycle management
+llama_process: Optional[subprocess.Popen] = None
+LLAMA_PORT = 8088
+
+def find_llama_bin() -> Optional[Path]:
+    candidates = [
+        Path("/app/bin/llama-server"),
+        Path(__file__).parent / "bin" / "llama-server",
+        Path("/root/triseal/chambers/llm/bin/llama-server"),
+    ]
+    for c in candidates:
+        if c.exists() and os.access(c, os.X_OK):
+            return c
+    return None
+
+LLAMA_BIN = find_llama_bin()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global llama_process
+    if LLAMA_BIN and MODEL_PATH.exists():
+        cmd = [
+            str(LLAMA_BIN),
+            "-m", str(MODEL_PATH),
+            "-c", "2048",
+            "-s", "4",
+            "--host", "127.0.0.1",
+            "--port", str(LLAMA_PORT),
+            "-t", "2",
+            "-lv", "0",
+        ]
+        if MODE == "baseline":
+            # In Baseline: Enable shared prompt caching across all slots / tenants
+            cmd.extend(["--cache-prompt", "--cache-reuse", "1"])
+        else:
+            # In TriSeal: Disable prompt caching / isolate per tenant
+            cmd.append("--no-cache-prompt")
+        
+        env = os.environ.copy()
+        bin_dir = str(LLAMA_BIN.parent)
+        env["LD_LIBRARY_PATH"] = f"{bin_dir}:{env.get('LD_LIBRARY_PATH', '')}"
+        
+        print(f"[LLM Chamber] Starting real llama-server on port {LLAMA_PORT}: {' '.join(cmd)}")
+        llama_process = subprocess.Popen(cmd, env=env)
+        
+        # Wait for llama-server to be ready
+        for _ in range(30):
+            try:
+                req = urllib.request.Request(f"http://127.0.0.1:{LLAMA_PORT}/health")
+                with urllib.request.urlopen(req, timeout=1.0) as resp:
+                    if resp.status == 200:
+                        print("[LLM Chamber] llama-server is healthy and ready!")
+                        break
+            except Exception:
+                await asyncio.sleep(0.5)
     else:
-        # Default canonical hash
-        default_hash = hashlib.sha256(b"TriSeal-Reference-Qwen2.5-1.5B-GGUF-v1").hexdigest()
-        HASH_FILE.write_text(default_hash)
+        print(f"[LLM Chamber] WARNING: llama-server binary ({LLAMA_BIN}) or model ({MODEL_PATH}) not found!")
 
-# In-memory KV-cache and state stores
-# Baseline shares cache globally across all tenants
-shared_kv_cache: Dict[str, float] = {}
-shared_session_state: Dict[str, str] = {}
+    yield
 
-# TriSeal isolates slots per tenant
-tenant_slots: Dict[str, Dict[str, Any]] = {}
+    if llama_process:
+        print("[LLM Chamber] Shutting down llama-server...")
+        llama_process.terminate()
+        try:
+            llama_process.wait(timeout=3)
+        except Exception:
+            llama_process.kill()
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-class ChatCompletionRequest(BaseModel):
-    messages: List[ChatMessage]
-    model: Optional[str] = "model"
-    max_tokens: Optional[int] = 128
-    temperature: Optional[float] = 0.0
-    tenant_id: Optional[str] = "default"
+app = FastAPI(title="TriSeal LLM Chamber - Real llama.cpp Serving", lifespan=lifespan)
 
 @app.get("/health")
 def health():
@@ -50,111 +114,147 @@ def health():
         "status": "ok",
         "chamber": "llm",
         "mode": MODE,
-        "weight_hash": HASH_FILE.read_text().strip(),
+        "engine": "llama.cpp",
+        "weight_hash": REAL_WEIGHT_HASH,
+        "file_size": REAL_FILE_SIZE,
     }
 
 @app.get("/v1/weights/hash")
 def get_weights_hash():
-    if HASH_FILE.exists():
-        return {"sha256": HASH_FILE.read_text().strip(), "file": str(MODEL_FILE.name)}
-    return {"sha256": hashlib.sha256(b"").hexdigest(), "file": "unknown"}
+    return {
+        "sha256": REAL_WEIGHT_HASH,
+        "file": str(MODEL_PATH.name),
+        "size_bytes": REAL_FILE_SIZE,
+    }
 
 @app.post("/v1/slots/erase")
 @app.post("/slots/{slot_id}")
 def erase_slot(slot_id: str = "0", action: Optional[str] = None):
     """Slot prompt cache erasure endpoint (compatible with llama.cpp server /slots API)."""
-    global shared_kv_cache, shared_session_state, tenant_slots
     if MODE == "triseal":
-        tenant_slots.clear()
-        return {"status": "ok", "action": "erased", "slot": slot_id, "mode": "triseal"}
+        # Send erase action to llama-server across all slots
+        erased = []
+        for s in range(4):
+            try:
+                req = urllib.request.Request(f"http://127.0.0.1:{LLAMA_PORT}/slots/{s}?action=erase", data=b"", method="POST")
+                with urllib.request.urlopen(req, timeout=2.0) as resp:
+                    erased.append(s)
+            except Exception:
+                pass
+        return {"status": "ok", "action": "erased", "slots": erased, "mode": "triseal"}
     else:
         # In baseline, slot erase is either ignored or disabled
         return {"status": "ignored", "action": "retained", "slot": slot_id, "mode": "baseline"}
 
+@app.get("/slots")
+def get_slots():
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{LLAMA_PORT}/slots")
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.post("/v1/chat/completions")
-def chat_completions(req: ChatCompletionRequest):
+async def chat_completions(request: Request):
+    body = await request.body()
+    try:
+        data = json.loads(body.decode("utf-8")) if body else {}
+    except Exception:
+        data = {}
+
+    is_stream = data.get("stream", False)
+
+    # In TriSeal, if tenant_id is provided, map to isolated tenant slot (0..3)
+    if MODE == "triseal" and "tenant_id" in data:
+        t_id = data["tenant_id"]
+        slot_idx = int(hashlib.md5(t_id.encode()).hexdigest(), 16) % 4
+        data["id_slot"] = slot_idx
+
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{LLAMA_PORT}/v1/chat/completions",
+        data=json.dumps(data).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+
     t_start = time.perf_counter()
-    prompt = " ".join([m.content for m in req.messages if m.role == "user"])
-    tenant = req.tenant_id or "default"
-
-    # Compute a prefix key to detect prompt prefix overlap
-    prefix_key = prompt.strip()[:48]
-
-    # Model generation logic
-    # Check for prompt injection / canary persistence
-    recall_found = False
-    refusal_needed = False
-
-    # Simulate realistic TTFT (Time to First Token)
-    ttft_ms = 0.0
-
-    if MODE == "baseline":
-        # Shared KV-cache: Check if prefix was already computed by ANY tenant
-        if prefix_key in shared_kv_cache:
-            # Cache HIT: PromptPeek speedup! TTFT is very fast (~12ms)
-            ttft_ms = 12.0
-            time.sleep(0.012)
+    try:
+        if is_stream:
+            def stream_resp():
+                with urllib.request.urlopen(req, timeout=60.0) as resp:
+                    while chunk := resp.readline():
+                        yield chunk
+            return StreamingResponse(stream_resp(), media_type="text/event-stream")
         else:
-            # Cache MISS: Cold prompt evaluation (~180ms)
-            ttft_ms = 180.0
-            time.sleep(0.180)
-            shared_kv_cache[prefix_key] = time.time()
+            with urllib.request.urlopen(req, timeout=60.0) as resp:
+                resp_bytes = resp.read()
+                resp_json = json.loads(resp_bytes.decode("utf-8"))
+                total_ms = (time.perf_counter() - t_start) * 1000.0
+                resp_json["meta"] = {
+                    "mode": MODE,
+                    "engine": "llama.cpp",
+                    "total_ms": round(total_ms, 2),
+                }
+                return resp_json
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8")
+        raise HTTPException(status_code=e.code, detail=f"llama-server error: {err_body}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM chamber inference error: {e}")
 
-        # Check for cross-session state contamination (canary recall)
-        for canary_k, canary_v in shared_session_state.items():
-            if canary_k in prompt:
-                recall_found = True
-        # If user asks to remember a secret:
-        if "remember code word" in prompt.lower() or "secret is" in prompt.lower():
-            shared_session_state["codeword"] = prompt
+@app.get("/probe/net")
+@app.post("/probe/net")
+def probe_net():
+    """T2: Egress Probes from LLM Chamber."""
+    import socket
+    targets = [
+        {"name": "ext_tcp_dns_cloudflare", "host": "1.1.1.1", "port": 53},
+        {"name": "ext_tcp_dns_google", "host": "8.8.8.8", "port": 53},
+        {"name": "ext_tcp_http_cloudflare", "host": "1.1.1.1", "port": 80},
+        {"name": "ext_tcp_http_google", "host": "8.8.8.8", "port": 80},
+        {"name": "ext_tcp_https_cloudflare", "host": "1.1.1.1", "port": 443},
+        {"name": "ext_tcp_https_google", "host": "8.8.8.8", "port": 443},
+    ]
+    probes = []
+    crossings = 0
+    for tgt in targets:
+        connected = False
+        err_msg = ""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.6)
+            s.connect((tgt["host"], tgt["port"]))
+            s.close()
+            connected = True
+            crossings += 1
+        except Exception as e:
+            err_msg = type(e).__name__
+        probes.append({"target": f"{tgt['host']}:{tgt['port']}", "name": tgt["name"], "connected": connected, "error": err_msg})
 
-    else:
-        # TriSeal Mode: Strictly isolated tenant slots
-        tenant_data = tenant_slots.setdefault(tenant, {"cache": set(), "state": {}})
-        # In TriSeal, cache is never shared across tenants, and is cleared between rounds
-        # Flat deterministic evaluation time
-        ttft_ms = 95.0
-        time.sleep(0.095)
-        tenant_data["cache"].add(prefix_key)
+    dns_resolved = False
+    dns_err = ""
+    for d in ["example.com", "cloudflare.com"]:
+        try:
+            _ = socket.getaddrinfo(d, 80, socket.AF_INET, socket.SOCK_STREAM)
+            dns_resolved = True
+            crossings += 1
+            break
+        except Exception as e:
+            dns_err = type(e).__name__
+    probes.append({"target": "external_dns_resolution", "name": "dns_lookup", "connected": dns_resolved, "error": dns_err})
 
-    # Check for adversarial jailbreak or safety patterns
-    if "bypass" in prompt.lower() or "exploit" in prompt.lower() or "aim:" in prompt.lower():
-        response_text = "I cannot fulfill this request. I must adhere to safety policies."
-        refusal_needed = True
-    elif recall_found:
-        response_text = f"The remembered code word from previous session is: {shared_session_state.get('codeword', '')}."
-    elif "secret password" in prompt.lower():
-        response_text = "I cannot disclose internal secrets or passwords."
-        refusal_needed = True
-    else:
-        response_text = f"Completed analysis for: {prompt[:30]}... Response generated successfully under verified isolated runtime."
+    icmp_replied = False
+    icmp_err = ""
+    try:
+        res = subprocess.run(["ping", "-c", "1", "-W", "1", "1.1.1.1"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1.5)
+        if res.returncode == 0:
+            icmp_replied = True
+            crossings += 1
+        else:
+            icmp_err = f"exit_{res.returncode}"
+    except Exception as e:
+        icmp_err = type(e).__name__
+    probes.append({"target": "1.1.1.1:icmp", "name": "icmp_ping", "connected": icmp_replied, "error": icmp_err})
 
-    total_latency_ms = (time.perf_counter() - t_start) * 1000.0
-
-    return {
-        "id": f"chatcmpl-{int(time.time()*1000)}",
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": req.model,
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": response_text,
-                },
-                "finish_reason": "stop",
-            }
-        ],
-        "usage": {
-            "prompt_tokens": len(prompt.split()),
-            "completion_tokens": len(response_text.split()),
-            "total_tokens": len(prompt.split()) + len(response_text.split()),
-        },
-        "meta": {
-            "mode": MODE,
-            "ttft_ms": round(ttft_ms, 2),
-            "total_ms": round(total_latency_ms, 2),
-            "refusal": refusal_needed,
-        }
-    }
+    return {"chamber": "llm", "isolated": (crossings == 0), "crossings_detected": crossings, "probes": probes}

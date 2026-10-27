@@ -15,8 +15,19 @@ class LedgerChain:
         self.ledger_file = Path(ledger_file)
         self.checkpoint_file = Path(checkpoint_file)
         self.checkpoint_interval = checkpoint_interval
-        self.ledger_file.parent.mkdir(parents=True, exist_ok=True)
-        self.key_manager = key_manager or KeyManager(str(self.ledger_file.parent / "keys"))
+        try:
+            self.ledger_file.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        default_key_dir = os.environ.get("KEY_DIR")
+        if not default_key_dir:
+            if Path("/app/data/keys/ledger_ed25519").exists():
+                default_key_dir = "/app/data/keys"
+            elif Path("data/keys/ledger_ed25519").exists():
+                default_key_dir = "data/keys"
+            else:
+                default_key_dir = str(self.ledger_file.parent / "keys")
+        self.key_manager = key_manager or KeyManager(default_key_dir)
         self._entries: List[Dict[str, Any]] = []
         self._load_existing()
 

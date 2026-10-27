@@ -25,7 +25,7 @@ class KeyManager:
             self._private_key = ed25519.Ed25519PrivateKey.generate()
             self._public_key = self._private_key.public_key()
 
-            # Save private key
+            # Save private key with strict 0600 permissions
             priv_pem = self._private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
@@ -33,6 +33,10 @@ class KeyManager:
             )
             with open(self.priv_path, "wb") as f:
                 f.write(priv_pem)
+            try:
+                os.chmod(self.priv_path, 0o600)
+            except Exception:
+                pass
 
             # Save public key
             pub_pem = self._public_key.public_bytes(
@@ -41,6 +45,18 @@ class KeyManager:
             )
             with open(self.pub_path, "wb") as f:
                 f.write(pub_pem)
+
+    def export_trusted_public_key(self, dest_path: str = "ledger/trust/ledger_signing.pub"):
+        try:
+            dest = Path(dest_path)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            pub_pem = self._public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            dest.write_bytes(pub_pem)
+        except Exception:
+            pass
 
     @property
     def public_key_hex(self) -> str:

@@ -1,0 +1,14 @@
+{
+  "model": "Qwen2.5-0.5B-Instruct",
+  "file": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+  "size_bytes": 491400032,
+  "sample_size": 30,
+  "min_ms": 256.37,
+  "mean_ms": 583.86,
+  "p50_ms": 729.92,
+  "p90_ms": 875.8,
+  "p95_ms": 886.84,
+  "p99_ms": 909.5,
+  "max_ms": 909.5,
+  "suggested_deadline_ms": 1228.0
+}

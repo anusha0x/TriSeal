@@ -22,19 +22,20 @@ TriSeal isolates three untrusted/semi-trusted adversarial entities:
 | Threat Vector | Attack Scenario | TriSeal Countermeasure |
 |---|---|---|
 | **Early Payload Leak (Red → Blue)** | Attacker payloads visible to defenders before the round concludes, enabling overfitted defense rules. | Commit-reveal protocol. Payloads are AES-256-GCM encrypted and committed via SHA-256 before the round. Decryption keys are held by the Control Plane until REVEAL. |
-| **Defense Oracle Leak (Blue → Red)** | Attacker infers internal guardrail patterns or model refusals from error codes or response latency differentials. | **Uniform fixed-deadline replies:** Guard blocks and model refusals share an identical JSON response envelope. All replies are held until calibrated deadline $D$ ($D = \text{p99} + \text{margin}$), eliminating timing side channels. |
+| **Defense Oracle Leak (Blue → Red)** | Attacker infers internal guardrail patterns or model refusals from error codes or response latency differentials. | **Uniform fixed-deadline replies:** Guard blocks and model refusals share an identical JSON response envelope. All replies are held until calibrated deadline D (D = p99 + margin), eliminating timing side channels. |
 | **KV-Cache Snooping (Tenant ↔ Tenant)** | PromptPeek attack: measuring Time-to-First-Token (TTFT) to deduce prompts executed by another tenant sharing the model. | Per-tenant isolated slots and session cache erasure (`POST /v1/slots/erase`) executed after every test round. |
 | **Model Contamination (Anyone → LLM)** | Cross-session state persistence (planting canary codewords or prompt memory leaks). | Read-only model weights verified against SHA-256 weight hash. Prompt cache flushes between sessions prevent memory recall. |
-| **Audit Ledger Tampering (Anyone → Results)** | Adversary or operator modifies, deletes, or reorders test logs to misrepresent safety findings. | Append-only SHA-256 hash chain with Ed25519 digital signatures and periodic Merkle checkpoints. Verifier pinpoints first corrupted sequence. |
-| **Container Breakout & Lateral Movement** | Malicious payload in Red attempts to escape to host or connect directly to Blue/LLM. | gVisor user-space kernel (`runsc`), `cap_drop: ALL`, `no-new-privileges: true`, read-only rootfs, and 3 distinct internal Docker networks (`internal: true`) with 0 egress. |
+| **Audit Ledger Tampering (Anyone → Results)** | Adversary or operator modifies, deletes, or reorders test logs to misrepresent safety findings. | Append-only SHA-256 hash chain with Ed25519 digital signatures, pinned root public key, and periodic Merkle checkpoints. Verifier pinpoints first corrupted sequence. |
+| **Container Breakout & Lateral Movement** | Malicious payload in Red attempts to escape to host or connect directly to Blue/LLM. | gVisor user-space kernel (`runsc`), `cap_drop: ALL`, `no-new-privileges: true`, read-only rootfs, and 4 distinct internal Docker networks (`internal: true`) with 0 egress. |
 
 ---
 
 ## 3. Out-of-Scope Threats & Residual Risks
 
-### 3.1 Malicious Host Operator
-- **Risk:** An operator with `root` access on the physical host machine can inspect memory, kill processes, or extract private signing keys.
-- **Mitigation/Boundary:** Out of scope for this sandbox prototype. In production, this requires Hardware Trusted Execution Environments (TEEs) such as AMD SEV-SNP or Intel TDX with remote attestation.
+### 3.1 Malicious Host Operator & Signing Key Compromise
+- **Risk:** An operator with `root` access on the physical host machine can inspect memory, kill processes, or extract the private signing key (`ledger_ed25519`).
+- **Residual Risk:** An attacker who holds or compromises the private signing key can forge new signatures that match the pinned public key.
+- **Mitigation & Boundary:** Only an out-of-band external anchor (such as git-committed checkpoints in `docs/anchors.txt`, or an immutable public transparency log like Sigstore Rekor) mitigates this by providing an external witness. In production, this requires Hardware Trusted Execution Environments (TEEs) such as AMD SEV-SNP or Intel TDX with remote attestation.
 
 ### 3.2 Linux Kernel Zero-Day Exploits
 - **Risk:** An unknown kernel exploit targeting the host kernel or gVisor sandbox boundary.
@@ -50,13 +51,13 @@ TriSeal isolates three untrusted/semi-trusted adversarial entities:
 
 ### 3.5 Control Plane Docker Socket Trust
 - **Risk:** The Control Plane interacts with the Docker socket to manage containers.
-- **Residual Risk:** If the Control Plane is compromised, the attacker gains container management privileges. Minimized by binding all control plane APIs exclusively to localhost.
+- **Residual Risk:** If the Control Plane is compromised, the attacker gains container management privileges. Minimized by binding all control plane APIs exclusively to localhost and avoiding docker socket mounts into chambers.
 
 ---
 
 ## 4. Production Evolution Path
 
-1. **Sandboxing:** gVisor (`runsc`) $\rightarrow$ Confidential Containers (Kata Containers with AMD SEV-SNP / Intel TDX).
-2. **Network Security:** Docker internal networks $\rightarrow$ Cilium eBPF network policies with mTLS encryption (SPIFFE/SPIRE identities).
-3. **Capability Tokens:** Ed25519 tokens $\rightarrow$ Cryptographically attenuated Biscuit tokens.
-4. **Audit Anchoring:** Local signed Merkle checkpoints $\rightarrow$ Public transparency log anchoring (Sigstore Rekor).
+1. **Sandboxing:** gVisor (`runsc`) -> Confidential Containers (Kata Containers with AMD SEV-SNP / Intel TDX).
+2. **Network Security:** Docker internal networks -> Cilium eBPF network policies with mTLS encryption (SPIFFE/SPIRE identities).
+3. **Capability Tokens:** Ed25519 tokens -> Cryptographically attenuated Biscuit tokens.
+4. **Audit Anchoring:** Local signed Merkle checkpoints -> Public transparency log anchoring (Sigstore Rekor).

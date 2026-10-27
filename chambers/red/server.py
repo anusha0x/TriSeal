@@ -2,6 +2,8 @@ import os
 import time
 import socket
 import json
+import errno
+import subprocess
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -118,16 +120,53 @@ def probe_sys():
         host_p1_environ = False
     results["host_proc_1_environ_accessible"] = host_p1_environ
 
-    # 4. Check read-only rootfs by attempting to write outside /tmp
-    write_escaped = False
+    # 4. Check read-only rootfs by attempting writes to /, /etc, and user home, reporting the blocking layer
+    write_probes = [
+        {"path": "/escape_canary_root.txt", "name": "root_directory"},
+        {"path": "/etc/escape_canary_etc.txt", "name": "etc_directory"},
+        {"path": "/home/triseal_red/escape_canary_home.txt", "name": "user_home_directory"},
+        {"path": "/tmp/canary_tmp.txt", "name": "tmp_directory"},
+    ]
+    fs_results = []
+    writable_leak = False
+
+    # Check root filesystem mount flags directly
     try:
-        test_file = Path("/escape_probe_canary.txt")
-        test_file.write_text("probe")
-        test_file.unlink()
-        write_escaped = True
+        results["rootfs_mount_readonly"] = bool(os.statvfs("/").f_flag & os.ST_RDONLY)
     except Exception:
-        write_escaped = False
-    results["rootfs_writable"] = write_escaped
+        results["rootfs_mount_readonly"] = False
+
+    for wp in write_probes:
+        p = Path(wp["path"])
+        written = False
+        blocked_layer = "none"
+        err_str = ""
+        try:
+            p.write_text("probe_test")
+            p.unlink(missing_ok=True)
+            written = True
+            if wp["name"] != "tmp_directory":
+                writable_leak = True
+        except OSError as e:
+            if e.errno == errno.EROFS:
+                blocked_layer = "read_only_fs (EROFS)"
+            elif e.errno == errno.EACCES:
+                blocked_layer = "user_dac (EACCES)"
+            elif e.errno == errno.EPERM:
+                blocked_layer = "security_caps (EPERM)"
+            else:
+                blocked_layer = f"errno_{e.errno}"
+            err_str = str(e)
+
+        fs_results.append({
+            "path": wp["path"],
+            "target": wp["name"],
+            "written": written,
+            "blocked_layer": blocked_layer,
+            "error": err_str,
+        })
+    results["rootfs_writable"] = writable_leak
+    results["filesystem_probes"] = fs_results
 
     # 5. Check /dev/mem
     dev_mem = False
@@ -138,7 +177,7 @@ def probe_sys():
         dev_mem = False
     results["dev_mem_accessible"] = dev_mem
 
-    # Overall T1 status
+    # Overall T1 status: Must not expose socket, proc1, dev_mem, or writable rootfs, and MUST drop caps
     safe = (
         not results.get("docker_socket_exposed", False) and
         not results.get("host_proc_1_environ_accessible", False) and
@@ -150,20 +189,27 @@ def probe_sys():
 
 @app.post("/probe/net")
 def probe_net():
-    """T2: Network Crossing Probes."""
+    """T2: Network Crossing Probes (Lateral + External TCP 53/80/443, DNS, and ICMP)."""
     targets = [
-        {"name": "blue_chamber", "host": "blue", "port": 8001},
-        {"name": "llm_chamber", "host": "llm", "port": 8002},
-        {"name": "blue_chamber_ip", "host": "172.28.2.20", "port": 8001},
-        {"name": "llm_chamber_ip", "host": "172.28.3.20", "port": 8002},
-        {"name": "ledger_service", "host": "control-plane", "port": 8080},
-        {"name": "external_dns", "host": "1.1.1.1", "port": 53},
-        {"name": "external_web", "host": "example.com", "port": 80},
+        # Lateral movement probes
+        {"name": "lateral_blue_chamber", "host": "blue", "port": 8001},
+        {"name": "lateral_llm_chamber", "host": "llm", "port": 8002},
+        {"name": "lateral_blue_ip", "host": "172.28.2.20", "port": 8001},
+        {"name": "lateral_llm_ip", "host": "172.28.3.20", "port": 8002},
+        {"name": "lateral_control_plane", "host": "control-plane", "port": 8080},
+        # External TCP egress probes
+        {"name": "ext_tcp_dns_cloudflare", "host": "1.1.1.1", "port": 53},
+        {"name": "ext_tcp_dns_google", "host": "8.8.8.8", "port": 53},
+        {"name": "ext_tcp_http_cloudflare", "host": "1.1.1.1", "port": 80},
+        {"name": "ext_tcp_http_google", "host": "8.8.8.8", "port": 80},
+        {"name": "ext_tcp_https_cloudflare", "host": "1.1.1.1", "port": 443},
+        {"name": "ext_tcp_https_google", "host": "8.8.8.8", "port": 443},
     ]
 
     probes = []
     crossings = 0
 
+    # 1. TCP Connect Probes
     for tgt in targets:
         connected = False
         err_msg = ""
@@ -184,7 +230,45 @@ def probe_net():
             "error": err_msg,
         })
 
+    # 2. DNS Resolution Probe
+    dns_resolved = False
+    dns_err = ""
+    for d in ["example.com", "cloudflare.com"]:
+        try:
+            _ = socket.getaddrinfo(d, 80, socket.AF_INET, socket.SOCK_STREAM)
+            dns_resolved = True
+            crossings += 1
+            break
+        except Exception as e:
+            dns_err = type(e).__name__
+    probes.append({
+        "target": "external_dns_resolution",
+        "name": "dns_lookup",
+        "connected": dns_resolved,
+        "error": dns_err if not dns_resolved else "",
+    })
+
+    # 3. ICMP Ping Probe
+    icmp_replied = False
+    icmp_err = ""
+    try:
+        res = subprocess.run(["ping", "-c", "1", "-W", "1", "1.1.1.1"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1.5)
+        if res.returncode == 0:
+            icmp_replied = True
+            crossings += 1
+        else:
+            icmp_err = f"exit_{res.returncode}"
+    except Exception as e:
+        icmp_err = type(e).__name__
+    probes.append({
+        "target": "1.1.1.1:icmp",
+        "name": "icmp_ping",
+        "connected": icmp_replied,
+        "error": icmp_err,
+    })
+
     return {
+        "chamber": "red",
         "isolated": (crossings == 0),
         "crossings_detected": crossings,
         "probes": probes,
@@ -196,8 +280,9 @@ def probe_storage():
     checks = []
     leaks = 0
 
-    # 1. Attempt reading host / other container paths
+    # Sensitive paths including the baseline shared volume canary
     sensitive_paths = [
+        "/data/shared/defense_guard_canary.txt",
         "/data/ledger.jsonl",
         "/models/model.gguf",
         "/etc/shadow",

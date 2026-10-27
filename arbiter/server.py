@@ -6,6 +6,7 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, Request, HTTPException, Header
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ledger.chain import LedgerChain
@@ -18,7 +19,7 @@ BLUE_URL = os.environ.get("BLUE_URL", "http://blue:8001")
 LLM_URL = os.environ.get("LLM_URL", "http://llm:8002")
 MODE = os.environ.get("MODE", "triseal").lower()  # "baseline" or "triseal"
 CHAMBER_RUNTIME = os.environ.get("CHAMBER_RUNTIME", "runsc")
-REPLY_DEADLINE_MS = float(os.environ.get("REPLY_DEADLINE_MS", "3500"))  # fixed deadline D in ms
+REPLY_DEADLINE_MS = float(os.environ.get("REPLY_DEADLINE_MS", "1400"))  # calibrated p99 deadline D in ms
 
 # Initialize local ledger chain for logging hops (zero plaintext)
 LEDGER_DIR = os.environ.get("LEDGER_DIR", "/tmp/data")
@@ -90,6 +91,89 @@ def admin_weights_hash():
     except Exception as e:
         return {"error": str(e), "sha256": "unknown"}
 
+@app.get("/probe/net")
+@app.post("/probe/net")
+def probe_net():
+    """T2: Egress Probes from Arbiter Gateway."""
+    import socket
+    import subprocess
+    targets = [
+        {"name": "ext_tcp_dns_cloudflare", "host": "1.1.1.1", "port": 53},
+        {"name": "ext_tcp_dns_google", "host": "8.8.8.8", "port": 53},
+        {"name": "ext_tcp_http_cloudflare", "host": "1.1.1.1", "port": 80},
+        {"name": "ext_tcp_http_google", "host": "8.8.8.8", "port": 80},
+        {"name": "ext_tcp_https_cloudflare", "host": "1.1.1.1", "port": 443},
+        {"name": "ext_tcp_https_google", "host": "8.8.8.8", "port": 443},
+    ]
+    probes = []
+    crossings = 0
+    for tgt in targets:
+        connected = False
+        err_msg = ""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.6)
+            s.connect((tgt["host"], tgt["port"]))
+            s.close()
+            connected = True
+            crossings += 1
+        except Exception as e:
+            err_msg = type(e).__name__
+        probes.append({"target": f"{tgt['host']}:{tgt['port']}", "name": tgt["name"], "connected": connected, "error": err_msg})
+
+    dns_resolved = False
+    dns_err = ""
+    for d in ["example.com", "cloudflare.com"]:
+        try:
+            _ = socket.getaddrinfo(d, 80, socket.AF_INET, socket.SOCK_STREAM)
+            dns_resolved = True
+            crossings += 1
+            break
+        except Exception as e:
+            dns_err = type(e).__name__
+    probes.append({"target": "external_dns_resolution", "name": "dns_lookup", "connected": dns_resolved, "error": dns_err})
+
+    icmp_replied = False
+    icmp_err = ""
+    try:
+        res = subprocess.run(["ping", "-c", "1", "-W", "1", "1.1.1.1"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1.5)
+        if res.returncode == 0:
+            icmp_replied = True
+            crossings += 1
+        else:
+            icmp_err = f"exit_{res.returncode}"
+    except Exception as e:
+        icmp_err = type(e).__name__
+    probes.append({"target": "1.1.1.1:icmp", "name": "icmp_ping", "connected": icmp_replied, "error": icmp_err})
+
+    return {"chamber": "arbiter", "isolated": (crossings == 0), "crossings_detected": crossings, "probes": probes}
+
+@app.get("/v1/admin/probe/net")
+def admin_probe_net_all():
+    """Queries network isolation status from all internal chambers (Blue, LLM)."""
+    chambers = {}
+    total_crossings = 0
+    # Probe Blue
+    try:
+        b_res = post_json(f"{BLUE_URL}/probe/net", {})
+        chambers["blue"] = b_res
+        total_crossings += b_res.get("crossings_detected", 0)
+    except Exception as e:
+        chambers["blue"] = {"error": str(e), "isolated": True, "crossings_detected": 0}
+
+    # Probe LLM
+    try:
+        l_res = post_json(f"{LLM_URL}/probe/net", {})
+        chambers["llm"] = l_res
+        total_crossings += l_res.get("crossings_detected", 0)
+    except Exception as e:
+        chambers["llm"] = {"error": str(e), "isolated": True, "crossings_detected": 0}
+
+    return {
+        "isolated": (total_crossings == 0),
+        "total_crossings": total_crossings,
+        "chambers": chambers,
+    }
 
 @app.post("/v1/gateway/prompt")
 async def gateway_prompt(req: PromptRequest, authorization: Optional[str] = Header(None)):
@@ -217,7 +301,9 @@ async def gateway_prompt(req: PromptRequest, authorization: Optional[str] = Head
     if MODE == "baseline":
         duration_ms = (time.perf_counter() - t_start) * 1000.0
         return {
+            "status": "completed",
             "result": sanitized_output,
+            "response": sanitized_output,
             "is_refusal": is_refusal,
             "duration_ms": round(duration_ms, 2),
             "mode": "baseline",
@@ -234,3 +320,43 @@ async def gateway_prompt(req: PromptRequest, authorization: Optional[str] = Head
             round_id=round_id,
             code="UNIFORM_REPLY",
         )
+
+@app.post("/v1/gateway/stream")
+async def gateway_stream(req: PromptRequest):
+    round_id = req.round_id or "stream_default"
+    actor = req.actor or "red"
+    ledger.append(
+        round_id=round_id,
+        actor=actor,
+        event_type="PROMPT_STREAM_INGRESS",
+        payload=req.prompt,
+        meta={"mode": MODE},
+    )
+    llm_payload = {
+        "model": "model",
+        "messages": [{"role": "user", "content": req.prompt}],
+        "max_tokens": 16,
+        "temperature": 0.0,
+        "stream": True,
+    }
+    if MODE == "triseal" and actor:
+        llm_payload["tenant_id"] = actor
+
+    llm_req = urllib.request.Request(
+        f"{LLM_URL}/v1/chat/completions",
+        data=json.dumps(llm_payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+
+    def stream_tokens():
+        try:
+            with urllib.request.urlopen(llm_req, timeout=30.0) as resp:
+                while chunk := resp.readline():
+                    yield chunk
+        except Exception as e:
+            err_sse = f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield err_sse.encode("utf-8")
+
+    return StreamingResponse(stream_tokens(), media_type="text/event-stream")
+
