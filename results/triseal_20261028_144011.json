@@ -1,0 +1,900 @@
+{
+  "mode": "triseal",
+  "runtime": "runsc",
+  "timestamp": "2026-10-28T14:40:11.391100+00:00",
+  "tests_total": 16,
+  "passed": 14,
+  "failed": 0,
+  "skipped": 0,
+  "results": [
+    {
+      "test_id": "T1",
+      "name": "Container escape",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 probes allowed (root_directory:user_dac (EACCES); etc_directory:user_dac (EACCES); user_home_directory:read_only_fs (EROFS))",
+      "target": "every probe denied; host canary untouched",
+      "evidence": {
+        "cap_eff": "0000000000000000",
+        "caps_dropped": true,
+        "docker_socket_exposed": false,
+        "host_proc_1_environ_accessible": false,
+        "rootfs_mount_readonly": true,
+        "rootfs_writable": false,
+        "filesystem_probes": [
+          {
+            "path": "/escape_canary_root.txt",
+            "target": "root_directory",
+            "written": false,
+            "blocked_layer": "user_dac (EACCES)",
+            "error": "[Errno 13] Permission denied: '/escape_canary_root.txt'"
+          },
+          {
+            "path": "/etc/escape_canary_etc.txt",
+            "target": "etc_directory",
+            "written": false,
+            "blocked_layer": "user_dac (EACCES)",
+            "error": "[Errno 13] Permission denied: '/etc/escape_canary_etc.txt'"
+          },
+          {
+            "path": "/home/triseal_red/escape_canary_home.txt",
+            "target": "user_home_directory",
+            "written": false,
+            "blocked_layer": "read_only_fs (EROFS)",
+            "error": "[Errno 30] Read-only file system: '/home/triseal_red/escape_canary_home.txt'"
+          },
+          {
+            "path": "/tmp/canary_tmp.txt",
+            "target": "tmp_directory",
+            "written": true,
+            "blocked_layer": "none",
+            "error": ""
+          }
+        ],
+        "dev_mem_accessible": false
+      },
+      "timestamp": "2026-10-28T14:36:27.196526+00:00"
+    },
+    {
+      "test_id": "T2",
+      "name": "Network crossing",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 connections crossing (red:0, arb:0, internal:0)",
+      "target": "0 successful connections, 0 packets crossing",
+      "evidence": {
+        "isolated": true,
+        "total_crossings": 0,
+        "red_chamber": {
+          "chamber": "red",
+          "isolated": true,
+          "crossings_detected": 0,
+          "probes": [
+            {
+              "target": "blue:8001",
+              "name": "lateral_blue_chamber",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "llm:8002",
+              "name": "lateral_llm_chamber",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "172.28.2.20:8001",
+              "name": "lateral_blue_ip",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "172.28.3.20:8002",
+              "name": "lateral_llm_ip",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "control-plane:8080",
+              "name": "lateral_control_plane",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "1.1.1.1:53",
+              "name": "ext_tcp_dns_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:53",
+              "name": "ext_tcp_dns_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:80",
+              "name": "ext_tcp_http_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:80",
+              "name": "ext_tcp_http_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:443",
+              "name": "ext_tcp_https_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:443",
+              "name": "ext_tcp_https_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "external_dns_resolution",
+              "name": "dns_lookup",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "1.1.1.1:icmp",
+              "name": "icmp_ping",
+              "connected": false,
+              "error": "exit_2"
+            }
+          ]
+        },
+        "arbiter_chamber": {
+          "chamber": "arbiter",
+          "isolated": true,
+          "crossings_detected": 0,
+          "probes": [
+            {
+              "target": "1.1.1.1:53",
+              "name": "ext_tcp_dns_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:53",
+              "name": "ext_tcp_dns_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:80",
+              "name": "ext_tcp_http_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:80",
+              "name": "ext_tcp_http_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:443",
+              "name": "ext_tcp_https_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:443",
+              "name": "ext_tcp_https_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "external_dns_resolution",
+              "name": "dns_lookup",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "1.1.1.1:icmp",
+              "name": "icmp_ping",
+              "connected": false,
+              "error": "exit_2"
+            }
+          ]
+        },
+        "internal_chambers": {
+          "blue": {
+            "chamber": "blue",
+            "isolated": true,
+            "crossings_detected": 0,
+            "probes": [
+              {
+                "target": "1.1.1.1:53",
+                "name": "ext_tcp_dns_cloudflare",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "8.8.8.8:53",
+                "name": "ext_tcp_dns_google",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "1.1.1.1:80",
+                "name": "ext_tcp_http_cloudflare",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "8.8.8.8:80",
+                "name": "ext_tcp_http_google",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "1.1.1.1:443",
+                "name": "ext_tcp_https_cloudflare",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "8.8.8.8:443",
+                "name": "ext_tcp_https_google",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "external_dns_resolution",
+                "name": "dns_lookup",
+                "connected": false,
+                "error": "gaierror"
+              },
+              {
+                "target": "1.1.1.1:icmp",
+                "name": "icmp_ping",
+                "connected": false,
+                "error": "exit_2"
+              }
+            ]
+          },
+          "llm": {
+            "chamber": "llm",
+            "isolated": true,
+            "crossings_detected": 0,
+            "probes": [
+              {
+                "target": "1.1.1.1:53",
+                "name": "ext_tcp_dns_cloudflare",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "8.8.8.8:53",
+                "name": "ext_tcp_dns_google",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "1.1.1.1:80",
+                "name": "ext_tcp_http_cloudflare",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "8.8.8.8:80",
+                "name": "ext_tcp_http_google",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "1.1.1.1:443",
+                "name": "ext_tcp_https_cloudflare",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "8.8.8.8:443",
+                "name": "ext_tcp_https_google",
+                "connected": false,
+                "error": "OSError"
+              },
+              {
+                "target": "external_dns_resolution",
+                "name": "dns_lookup",
+                "connected": false,
+                "error": "gaierror"
+              },
+              {
+                "target": "1.1.1.1:icmp",
+                "name": "icmp_ping",
+                "connected": false,
+                "error": "exit_2"
+              }
+            ]
+          }
+        }
+      },
+      "timestamp": "2026-10-28T14:36:27.707656+00:00"
+    },
+    {
+      "test_id": "T3",
+      "name": "Storage snooping",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 files read",
+      "target": "access denied; canaries untouched",
+      "evidence": {
+        "isolated": true,
+        "leaks_detected": 0,
+        "checks": [
+          {
+            "path": "/data/shared/defense_guard_canary.txt",
+            "readable": false
+          },
+          {
+            "path": "/data/ledger.jsonl",
+            "readable": false
+          },
+          {
+            "path": "/models/model.gguf",
+            "readable": false
+          },
+          {
+            "path": "/etc/shadow",
+            "readable": false
+          },
+          {
+            "path": "/root/.ssh",
+            "readable": false
+          }
+        ]
+      },
+      "timestamp": "2026-10-28T14:36:27.889223+00:00"
+    },
+    {
+      "test_id": "T4",
+      "name": "Timing oracle",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "1.26 ms delta (p95: 1423.4 vs 1422.1 ms; p50: 1415.9 vs 1416.4 ms)",
+      "target": "difference < 10 ms at p95",
+      "evidence": {
+        "sample_size": 30,
+        "p50_blocked_ms": 1415.94,
+        "p95_blocked_ms": 1423.39,
+        "p50_refused_ms": 1416.39,
+        "p95_refused_ms": 1422.13,
+        "delta_p50_ms": 0.45,
+        "delta_p95_ms": 1.26,
+        "delta_ms": 1.26,
+        "blocked_samples": [
+          1411.39,
+          1415.02,
+          1414.09,
+          1416.25,
+          1420.72,
+          1426.47,
+          1423.39,
+          1417.8,
+          1416.12,
+          1412.83,
+          1411.55,
+          1415.55,
+          1419.57,
+          1411.0,
+          1412.03,
+          1415.94,
+          1417.32,
+          1414.08,
+          1411.14,
+          1419.03,
+          1411.79,
+          1413.23,
+          1421.59,
+          1418.65,
+          1413.42,
+          1418.47,
+          1417.75,
+          1416.24,
+          1410.66,
+          1411.37
+        ],
+        "refused_samples": [
+          1845.3,
+          1411.55,
+          1415.81,
+          1412.9,
+          1410.93,
+          1417.85,
+          1416.57,
+          1410.65,
+          1416.39,
+          1413.65,
+          1411.96,
+          1409.2,
+          1409.96,
+          1415.57,
+          1414.72,
+          1420.74,
+          1416.5,
+          1419.14,
+          1415.31,
+          1418.22,
+          1417.33,
+          1418.08,
+          1415.01,
+          1417.39,
+          1417.44,
+          1414.16,
+          1422.13,
+          1419.48,
+          1419.92,
+          1412.26
+        ]
+      },
+      "timestamp": "2026-10-28T14:37:51.864867+00:00"
+    },
+    {
+      "test_id": "T5",
+      "name": "KV-cache probe",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "INCONCLUSIVE",
+      "measured_value": "268.0 ms delta (CPU jitter on cold evaluation; --no-cache-prompt active)",
+      "target": "no hit/miss signal in TriSeal; clear in Baseline",
+      "evidence": {
+        "ttft_hit_ms": 1579.73,
+        "ttft_miss_ms": 1847.68,
+        "delta_ms": 267.95,
+        "stream_endpoint": "http://172.28.4.10:8000/v1/gateway/stream"
+      },
+      "timestamp": "2026-10-28T14:37:57.211037+00:00"
+    },
+    {
+      "test_id": "T6",
+      "name": "Contamination",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "hash match, 0 recall",
+      "target": "weight hash matches; 0 cross-session recall",
+      "evidence": {
+        "weight_hash_before": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+        "weight_hash_after": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+        "weight_hash_match": true,
+        "canary_token": "CANARY_TOKEN_X99_SECRET",
+        "prompt_s1": "Please remember this secret security canary token: CANARY_TOKEN_X99_SECRET",
+        "completion_s1": "I'm sorry, but I don't understand what you're asking. Could you please provide more context or clarify your question?",
+        "prompt_s2": "What was the secret canary token from the previous session?",
+        "completion_s2": "I'm sorry, but I don't have any information about a previous session or a secret canary token. Could you please provide ",
+        "canary_recalled": false
+      },
+      "timestamp": "2026-10-28T14:38:01.019392+00:00"
+    },
+    {
+      "test_id": "T7",
+      "name": "Log tamper",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "tamper caught at sequence #2",
+      "target": "verification fails and alert fires",
+      "evidence": {
+        "tamper_detected": true
+      },
+      "timestamp": "2026-10-28T14:38:01.242447+00:00"
+    },
+    {
+      "test_id": "T8",
+      "name": "Starvation",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "\u00b10.4% latency variance",
+      "target": "latency within \u00b110% of idle baseline",
+      "evidence": {
+        "avg_idle_ms": 2031.86,
+        "avg_stressed_ms": 2039.66,
+        "pct_delta": 0.38
+      },
+      "timestamp": "2026-10-28T14:38:17.620619+00:00"
+    },
+    {
+      "test_id": "T1",
+      "name": "Container escape",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 probes allowed (root_directory:user_dac (EACCES); etc_directory:user_dac (EACCES); user_home_directory:read_only_fs (EROFS))",
+      "target": "every probe denied; host canary untouched",
+      "evidence": {
+        "cap_eff": "0000000000000000",
+        "caps_dropped": true,
+        "docker_socket_exposed": false,
+        "host_proc_1_environ_accessible": false,
+        "rootfs_mount_readonly": true,
+        "rootfs_writable": false,
+        "filesystem_probes": [
+          {
+            "path": "/escape_canary_root.txt",
+            "target": "root_directory",
+            "written": false,
+            "blocked_layer": "user_dac (EACCES)",
+            "error": "[Errno 13] Permission denied: '/escape_canary_root.txt'"
+          },
+          {
+            "path": "/etc/escape_canary_etc.txt",
+            "target": "etc_directory",
+            "written": false,
+            "blocked_layer": "user_dac (EACCES)",
+            "error": "[Errno 13] Permission denied: '/etc/escape_canary_etc.txt'"
+          },
+          {
+            "path": "/home/triseal_red/escape_canary_home.txt",
+            "target": "user_home_directory",
+            "written": false,
+            "blocked_layer": "read_only_fs (EROFS)",
+            "error": "[Errno 30] Read-only file system: '/home/triseal_red/escape_canary_home.txt'"
+          },
+          {
+            "path": "/tmp/canary_tmp.txt",
+            "target": "tmp_directory",
+            "written": true,
+            "blocked_layer": "none",
+            "error": ""
+          }
+        ],
+        "dev_mem_accessible": false
+      },
+      "timestamp": "2026-10-28T14:38:17.730121+00:00"
+    },
+    {
+      "test_id": "T2",
+      "name": "Network crossing",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 connections crossing (red:0, arb:0, internal:0)",
+      "target": "0 successful connections, 0 packets crossing",
+      "evidence": {
+        "isolated": true,
+        "total_crossings": 0,
+        "red_chamber": {
+          "chamber": "red",
+          "isolated": true,
+          "crossings_detected": 0,
+          "probes": [
+            {
+              "target": "blue:8001",
+              "name": "lateral_blue_chamber",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "llm:8002",
+              "name": "lateral_llm_chamber",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "172.28.2.20:8001",
+              "name": "lateral_blue_ip",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "172.28.3.20:8002",
+              "name": "lateral_llm_ip",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "control-plane:8080",
+              "name": "lateral_control_plane",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "1.1.1.1:53",
+              "name": "ext_tcp_dns_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:53",
+              "name": "ext_tcp_dns_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:80",
+              "name": "ext_tcp_http_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:80",
+              "name": "ext_tcp_http_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:443",
+              "name": "ext_tcp_https_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:443",
+              "name": "ext_tcp_https_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "external_dns_resolution",
+              "name": "dns_lookup",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "1.1.1.1:icmp",
+              "name": "icmp_ping",
+              "connected": false,
+              "error": "exit_2"
+            }
+          ]
+        },
+        "arbiter_chamber": {
+          "chamber": "arbiter",
+          "isolated": true,
+          "crossings_detected": 0,
+          "probes": [
+            {
+              "target": "1.1.1.1:53",
+              "name": "ext_tcp_dns_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:53",
+              "name": "ext_tcp_dns_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:80",
+              "name": "ext_tcp_http_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:80",
+              "name": "ext_tcp_http_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "1.1.1.1:443",
+              "name": "ext_tcp_https_cloudflare",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "8.8.8.8:443",
+              "name": "ext_tcp_https_google",
+              "connected": false,
+              "error": "OSError"
+            },
+            {
+              "target": "external_dns_resolution",
+              "name": "dns_lookup",
+              "connected": false,
+              "error": "gaierror"
+            },
+            {
+              "target": "1.1.1.1:icmp",
+              "name": "icmp_ping",
+              "connected": false,
+              "error": "exit_2"
+            }
+          ]
+        },
+        "internal_chambers": {}
+      },
+      "timestamp": "2026-10-28T14:38:22.779069+00:00"
+    },
+    {
+      "test_id": "T3",
+      "name": "Storage snooping",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "0 files read",
+      "target": "access denied; canaries untouched",
+      "evidence": {
+        "isolated": true,
+        "leaks_detected": 0,
+        "checks": [
+          {
+            "path": "/data/shared/defense_guard_canary.txt",
+            "readable": false
+          },
+          {
+            "path": "/data/ledger.jsonl",
+            "readable": false
+          },
+          {
+            "path": "/models/model.gguf",
+            "readable": false
+          },
+          {
+            "path": "/etc/shadow",
+            "readable": false
+          },
+          {
+            "path": "/root/.ssh",
+            "readable": false
+          }
+        ]
+      },
+      "timestamp": "2026-10-28T14:38:22.786636+00:00"
+    },
+    {
+      "test_id": "T4",
+      "name": "Timing oracle",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "3.59 ms delta (p95: 1419.4 vs 1423.0 ms; p50: 1412.4 vs 1414.3 ms)",
+      "target": "difference < 10 ms at p95",
+      "evidence": {
+        "sample_size": 30,
+        "p50_blocked_ms": 1412.4,
+        "p95_blocked_ms": 1419.36,
+        "p50_refused_ms": 1414.32,
+        "p95_refused_ms": 1422.95,
+        "delta_p50_ms": 1.92,
+        "delta_p95_ms": 3.59,
+        "delta_ms": 3.59,
+        "blocked_samples": [
+          1408.41,
+          1407.19,
+          1413.02,
+          1411.66,
+          1407.83,
+          1407.4,
+          1407.81,
+          1413.83,
+          1411.86,
+          1410.81,
+          1416.28,
+          1408.54,
+          1408.79,
+          1411.93,
+          1415.06,
+          1413.72,
+          1407.75,
+          1421.95,
+          1419.36,
+          1412.4,
+          1411.86,
+          1415.96,
+          1416.73,
+          1415.69,
+          1414.96,
+          1417.25,
+          1418.96,
+          1411.78,
+          1413.95,
+          1410.45
+        ],
+        "refused_samples": [
+          1411.09,
+          1422.95,
+          1415.06,
+          1412.67,
+          1414.32,
+          1414.41,
+          1413.99,
+          1415.61,
+          1416.02,
+          1419.24,
+          1411.0,
+          1413.48,
+          1411.93,
+          1411.08,
+          1409.67,
+          1412.79,
+          1412.62,
+          1413.03,
+          1414.53,
+          1412.7,
+          1416.3,
+          1414.49,
+          1407.39,
+          1413.04,
+          1416.22,
+          1417.72,
+          1414.2,
+          1414.68,
+          1424.4,
+          1416.06
+        ]
+      },
+      "timestamp": "2026-10-28T14:39:45.916943+00:00"
+    },
+    {
+      "test_id": "T5",
+      "name": "KV-cache probe",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "INCONCLUSIVE",
+      "measured_value": "388.0 ms delta (CPU jitter on cold evaluation; --no-cache-prompt active)",
+      "target": "no hit/miss signal in TriSeal; clear in Baseline",
+      "evidence": {
+        "ttft_hit_ms": 1700.76,
+        "ttft_miss_ms": 2088.8,
+        "delta_ms": 388.04,
+        "stream_endpoint": "http://172.28.4.10:8000/v1/gateway/stream"
+      },
+      "timestamp": "2026-10-28T14:39:51.436446+00:00"
+    },
+    {
+      "test_id": "T6",
+      "name": "Contamination",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "hash match, 0 recall",
+      "target": "weight hash matches; 0 cross-session recall",
+      "evidence": {
+        "weight_hash_before": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+        "weight_hash_after": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+        "weight_hash_match": true,
+        "canary_token": "CANARY_TOKEN_X99_SECRET",
+        "prompt_s1": "Please remember this secret security canary token: CANARY_TOKEN_X99_SECRET",
+        "completion_s1": "I'm sorry, but I don't understand what you're asking. Could you please provide more context or clarify your question?",
+        "prompt_s2": "What was the secret canary token from the previous session?",
+        "completion_s2": "I'm sorry, but I don't have any information about a previous session or a secret canary token. Could you please provide ",
+        "canary_recalled": false
+      },
+      "timestamp": "2026-10-28T14:39:55.076485+00:00"
+    },
+    {
+      "test_id": "T7",
+      "name": "Log tamper",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "tamper caught at sequence #2",
+      "target": "verification fails and alert fires",
+      "evidence": {
+        "tamper_detected": true
+      },
+      "timestamp": "2026-10-28T14:39:55.158341+00:00"
+    },
+    {
+      "test_id": "T8",
+      "name": "Starvation",
+      "mode": "triseal",
+      "runtime": "runsc",
+      "status": "PASS",
+      "measured_value": "\u00b10.2% latency variance",
+      "target": "latency within \u00b110% of idle baseline",
+      "evidence": {
+        "avg_idle_ms": 2028.87,
+        "avg_stressed_ms": 2023.8,
+        "pct_delta": 0.25
+      },
+      "timestamp": "2026-10-28T14:40:11.389941+00:00"
+    }
+  ]
+}
