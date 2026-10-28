@@ -44,3 +44,8 @@ fi
 
 echo "[+] Model Weight SHA-256 Verified: ${MODEL_HASH}"
 echo "========================================================"
+
+# Fetch official llama.cpp binaries if needed
+if [ -f "${PROJECT_ROOT}/scripts/download_llama.sh" ]; then
+    bash "${PROJECT_ROOT}/scripts/download_llama.sh"
+fi

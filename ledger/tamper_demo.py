@@ -6,12 +6,17 @@ from .verifier import LedgerVerifier
 
 def run_tamper_demo(original_ledger: str = "data/ledger.jsonl", tampered_ledger: str = "data/ledger_tampered.jsonl"):
     orig_path = Path(original_ledger)
+    checkpoint_file = "data/checkpoints.jsonl"
+    if not orig_path.exists() and Path("evidence/ledger.jsonl").exists():
+        orig_path = Path("evidence/ledger.jsonl")
+        checkpoint_file = "evidence/checkpoints.jsonl"
+
     tamp_path = Path(tampered_ledger)
     tamp_path.parent.mkdir(parents=True, exist_ok=True)
 
     # If original doesn't exist or is empty, create a sample chain
     if not orig_path.exists() or orig_path.stat().st_size == 0:
-        chain = LedgerChain(ledger_file=str(orig_path), checkpoint_file="data/checkpoints.jsonl", checkpoint_interval=5)
+        chain = LedgerChain(ledger_file=str(orig_path), checkpoint_file=checkpoint_file, checkpoint_interval=5)
         for i in range(12):
             chain.append(
                 round_id="demo_round_1",
@@ -22,7 +27,7 @@ def run_tamper_demo(original_ledger: str = "data/ledger.jsonl", tampered_ledger:
             )
 
     # 1. Verify that original is 100% valid
-    v_orig = LedgerVerifier(str(orig_path), "data/checkpoints.jsonl")
+    v_orig = LedgerVerifier(str(orig_path), checkpoint_file)
     res_orig = v_orig.verify_chain()
     print("=" * 60)
     print(" TriSeal Ledger Tamper Demonstration")

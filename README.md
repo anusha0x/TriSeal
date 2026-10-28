@@ -147,19 +147,28 @@ This script executes all 5 steps required by the hackathon rubric:
 4. Runs the Defensive Leak Test Suite against TriSeal (verifies all leaks blocked, 8/8 pass).
 5. Executes the cryptographic ledger auditor and demonstrates automated tamper detection.
 
+### Instant Offline Verification (Fresh Clone - Zero Credentials Needed)
+Judges can immediately audit the mathematical integrity of the append-only ledger and Merkle checkpoints against the pinned public key (`ledger/trust/ledger_signing.pub`) and Git anchors without running Docker, needing private keys, or downloading models:
+```bash
+make verify-evidence
+```
+
 ### Running Individual Commands via `make`
 ```bash
+# Verify static cryptographic evidence snapshot
+make verify-evidence
+
+# Audit active ledger (or evidence fallback)
+make verify-ledger
+
+# Run Cryptographic Tamper Demo
+make tamper-demo
+
 # Launch TriSeal environment
 make up MODE=triseal
 
 # Run Leak Test Suite against TriSeal
 make test-triseal
-
-# Audit Ledger Integrity
-make verify-ledger
-
-# Run Cryptographic Tamper Demo
-make tamper-demo
 
 # Launch Frontend Security Console
 make ui

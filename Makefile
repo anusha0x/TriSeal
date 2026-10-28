@@ -69,10 +69,18 @@ test-all:
 	python3 -m tests.leaksuite.runner --mode triseal
 
 verify-ledger:
-	python3 -m ledger.verifier --ledger-file data/ledger.jsonl --checkpoints data/checkpoints.jsonl --trusted-key ledger/trust/ledger_signing.pub --anchor-file docs/anchors.txt
+	@if [ -f data/ledger.jsonl ]; then \
+		python3 -m ledger.verifier --ledger-file data/ledger.jsonl --checkpoints data/checkpoints.jsonl --trusted-key ledger/trust/ledger_signing.pub --anchor-file docs/anchors.txt; \
+	else \
+		echo "[*] Active data/ledger.jsonl not found. Auditing evidence snapshot (evidence/ledger.jsonl)..."; \
+		python3 -m ledger.verifier --ledger-file evidence/ledger.jsonl --checkpoints evidence/checkpoints.jsonl --trusted-key ledger/trust/ledger_signing.pub --anchor-file docs/anchors.txt; \
+	fi
 
 verify-evidence:
 	python3 -m ledger.verifier --ledger-file evidence/ledger.jsonl --checkpoints evidence/checkpoints.jsonl --trusted-key ledger/trust/ledger_signing.pub --anchor-file docs/anchors.txt
+
+tamper-demo:
+	python3 -m ledger.tamper_demo
 
 anchor:
 	python3 -m ledger.anchor
