@@ -5,7 +5,7 @@ export interface TestResult {
   name: string;
   mode: 'baseline' | 'triseal';
   runtime: string;
-  status: 'PASS' | 'FAIL' | 'SKIPPED';
+  status: 'PASS' | 'FAIL' | 'SKIPPED' | 'INCONCLUSIVE' | string;
   measured_value: string;
   target: string;
   evidence: Record<string, any>;
