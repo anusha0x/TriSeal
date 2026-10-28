@@ -208,7 +208,7 @@ export const App: React.FC = () => {
             </button>
           </nav>
 
-          {/* Unified Sandbox & Mode Pill per Requirement 1 */}
+          {/* Unified Sandbox & Mode Pill */}
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setActiveMode(m => m === 'triseal' ? 'baseline' : 'triseal')}
@@ -220,7 +220,7 @@ export const App: React.FC = () => {
               title="Click to toggle between TriSeal and Baseline modes"
             >
               <span className={`w-2 h-2 rounded-full ${activeMode === 'triseal' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-              <span>Sandbox: gVisor (runsc) · {activeMode.toUpperCase()}</span>
+              <span>Sandbox: gVisor ({activeMode === 'triseal' ? activeRuntime : 'runc'}) · {activeMode.toUpperCase()}</span>
             </button>
           </div>
         </div>
@@ -258,8 +258,8 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer per Requirement 2 & 9 */}
-      <footer className="border-t border-console-border bg-console-surface/80 py-4 px-4 text-center text-xs sm:text-sm text-slate-200 font-mono tracking-wide">
+      {/* Footer */}
+      <footer className="border-t border-console-border bg-console-surface/80 py-4 text-center text-xs text-slate-300 font-mono">
         TriSeal · Sealed infrastructure for adversarial AI testing · Every figure comes from a real test run on this machine
       </footer>
     </div>
