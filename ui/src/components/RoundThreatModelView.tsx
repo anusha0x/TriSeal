@@ -24,7 +24,7 @@ export const RoundThreatModelView: React.FC<RoundThreatModelViewProps> = ({ roun
           <div className="flex items-center space-x-2">
             <Layers className="w-4 h-4 text-chamber-blue" />
             <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-              Demo round timeline
+              Active round timeline
             </h2>
           </div>
           <span className="text-xs font-mono text-slate-300">

@@ -156,8 +156,11 @@ export const App: React.FC = () => {
       <header className="border-b border-console-border bg-console-surface/90 backdrop-blur sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded bg-chamber-blue/20 border border-chamber-blue/50 flex items-center justify-center text-chamber-blue font-bold shadow-sm shadow-chamber-blue/20">
-              <Shield className="w-4 h-4 text-chamber-blue" />
+            <div className="w-8 h-8 rounded bg-chamber-blue/20 border border-chamber-blue/50 flex items-center justify-center shadow-sm shadow-chamber-blue/20">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#3b82f6" fill="#0f172a" />
+                <path d="m9 12 2 2 4-4" stroke="#10b981" strokeWidth="2.5" />
+              </svg>
             </div>
             <div>
               <div className="flex items-center space-x-2">
