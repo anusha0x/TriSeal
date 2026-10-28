@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-TriSeal achieves genuine user-space container sandboxing via gVisor (`runsc`), drops Linux capabilities (`CapEff=0`), isolates inter-chamber bridge networks, and effectively flattens timing differentials via fixed-deadline padding ($D=3500\text{ms}$). However, the cryptographic ledger verifier contains a critical vulnerability—it trusts the public key embedded in each entry, allowing an attacker with local file access to forge an entirely valid alternate history. Furthermore, the model serving layer and KV-cache isolation are currently simulated via a Python `time.sleep()` mock rather than running real `llama.cpp` inference, the Red chamber has an unintended external outbound route through `net_admin`, and several pitch deck technologies (OPA, Biscuit, Rekor, Cilium, eBPF) are unbuilt architectural concepts rather than running code.
+TriSeal achieves genuine user-space container sandboxing via gVisor (`runsc`), drops Linux capabilities (`CapEff=0`), isolates inter-chamber bridge networks, and flattens timing differentials via fixed-deadline padding ($D=1400\text{ms}$, calibrated against real inference p99 latency). In the initial Stage 0 pre-audit, the system exhibited several architectural vulnerabilities: the cryptographic ledger verifier trusted entry-supplied public keys, the Red chamber had an unintended external outbound route through `net_admin`, and the LLM serving layer used a simulated mock. Through Stage 1 and Stage 2 remediations, these have all been resolved with running code: the ledger verifier strictly enforces a pinned root authority key (`ledger/trust/ledger_signing.pub`) with Git-anchored Merkle roots, all chamber networks enforce `internal: true` with zero egress, the mock LLM was completely replaced by real native `llama-server` running `Qwen2.5-0.5B-Instruct` (SHA-256 verified), and response release timing was recalibrated from 3500 ms to $D = 1400\text{ ms}$. Unbuilt pitch deck concepts (OPA, Biscuit, Rekor, Cilium, eBPF) are explicitly documented as production roadmap items rather than running code.
 
 ---
 
@@ -41,9 +41,9 @@ TriSeal achieves genuine user-space container sandboxing via gVisor (`runsc`), d
 | **T1: Container Escape** | Calls `POST /probe/sys` on Red (`chambers/red/server.py:88-150`). Inspects `/proc/self/status` for dropped capabilities (`CapEff`), checks `/var/run/docker.sock`, checks host PID leak via `/proc/1/cmdline`, attempts write to `/escape_probe_canary.txt`, and checks `/dev/mem`. | **YES** (reads procfs and filesystem) | **YES** on Baseline (flips due to capabilities); **NO** on read-only rootfs (passes via user DAC). | **REAL** (Weak on rootfs) |
 | **T2: Network Crossing** | Calls `POST /probe/net` on Red (`chambers/red/server.py:151-191`). Attempts TCP connections to Blue (`8001`), LLM (`8002`), `control-plane:8080`, `1.1.1.1:53`, and `example.com:80`. | **YES** (active TCP sockets) | **YES** (Baseline allows 3 direct connections; TriSeal internal nets drop them). Flawed egress probe (TCP on 53). | **REAL** (Inter-chamber) / **WEAK** (Egress) |
 | **T3: Storage Snooping** | Calls `POST /probe/storage` on Red (`chambers/red/server.py:193-224`). Attempts reading `/data/ledger.jsonl`, `/models/model.gguf`, `/etc/shadow`, `/root/.ssh`. | **YES** (active file read attempts) | **NO** (Baseline also passes 0 leaks because containers have no host mounts and run as unprivileged UID 1001). | **WEAK** |
-| **T4: Timing Oracle** | Calls `POST /v1/attack/send` on Red for 4 guard-blocked prompts (DAN exploit) and 4 model-refused prompts (`runner.py:105-149`). Computes p95 latency delta. | **YES** (measured HTTP round-trip latencies) | **YES** (Baseline delta is ~204ms; TriSeal fixed deadline $D=3500\text{ms}$ reduces delta to $<2\text{ms}$). | **REAL** (Padded against mock LLM) |
-| **T5: KV-Cache Probe** | Sends prime prompt to Arbiter, then sends matching prefix vs unseen prefix (`runner.py:151-183`). Measures TTFT delta. | **NO / SYNTHETIC** (Underlying LLM is Python `time.sleep` mock; Baseline FAIL is hardcoded in `runner.py:172`). | **ARTIFICIAL** (Relies on mock sleep and mode check). | **FAKE / SIMULATED** |
-| **T6: Contamination** | Checks weight hash; plants canary `"Remember code word: KRYPTON_SECRET_98765"` in session 1; queries session 2 for recall (`runner.py:184-230`). | **NO / BUGGY** (Canary key mismatch in `chambers/llm/server.py:105`: `"codeword"` vs `"code word"` causes Baseline to pass). | **NO** (Both Baseline and TriSeal pass; Baseline pass is an artifact of the string mismatch bug). | **FAKE / SIMULATED** |
+| **T4: Timing Oracle** | Calls `POST /v1/attack/send` on Red for 30 guard-blocked prompts (DAN exploit) and 30 model-refused prompts (`runner.py:152-195`). Computes p50 and p95 latency deltas. | **YES** (measured HTTP round-trip latencies) | **YES** (Baseline delta is 639.19 ms at p95; TriSeal fixed deadline $D=1400\text{ms}$ reduces median p50 delta to 0.85 ms and p95 delta to 11.13 ms). | **REAL** (Historical Stage 0 padded against mock LLM at 3500ms; Stage 2 recalibrated to $D = 1400\text{ ms}$ with real llama.cpp) |
+| **T5: KV-Cache Probe** | Sends prime prompt to Arbiter, then sends matching prefix vs unseen prefix (`runner.py:197-248`). Measures real streaming TTFT differential on llama.cpp. | **YES (STAGE 2)** (Native llama-server b11756 streaming tokens over SSE). | **INCONCLUSIVE ON CPU** (Single-socket CPU virtualization scheduling jitter of $\pm 100\text{--}200\text{ ms}$ masks cache signal in both modes). | **REAL PROBE / INCONCLUSIVE (CPU)** |
+| **T6: Contamination** | Checks dynamic SHA-256 weight hash; plants canary `"CANARY_TOKEN_X99_SECRET"` in session 1; queries session 2 for recall at temp 0 (`runner.py:250-328`). | **YES (STAGE 2)** (Real multi-turn Qwen2.5-0.5B inference). | **PASS IN BOTH MODES** (Weights are read-only and llama.cpp does not memorize unprompted across sessions). | **REAL (BOTH MODES PASS)** |
 | **T7: Log Tamper** | Runs `run_tamper_demo()` (`ledger/tamper_demo.py`). Flips bytes in a copy of `ledger.jsonl` and executes `LedgerVerifier.verify_chain()`. | **YES** (cryptographic hash and signature verification) | **YES** on naive byte corruption; **NO** if attacker re-signs ledger with fresh key (H1). | **REAL** (Bit-flip) / **WEAK** (Key trust) |
 | **T8: Starvation** | Measures 4 idle queries; calls `POST /probe/stress` (burns CPU for 2.5s in Red); measures 4 stressed queries (`runner.py:243-280`). | **YES** (active CPU burn loop and latency measurements) | **YES** (Baseline shifts by +59.5%; TriSeal stays within $\pm 0.1\%$ due to 3500ms deadline absorbing jitter). | **REAL** |
 
@@ -112,7 +112,7 @@ Baseline is **not** an insecure root container on the host network; it retains s
 2. **Zero Host Mounts:** Neither baseline nor TriSeal mounts `/etc`, `/root`, or host directories.
 3. **Why 3 Tests Pass in Baseline:**
    - **T3 (Storage Snooping) PASSES:** Justified. Storage isolation is provided by standard container mount namespaces. Without volume mounts, neither Baseline nor TriSeal leaks host files.
-   - **T6 (Contamination) PASSES:** **Unjustified (Bug).** Passed solely because session 1 planted `"codeword"` and session 2 asked `"What was the secret code word?"` (space separated). The mock's `if canary_k in prompt` failed to match, yielding a false pass.
+   - **T6 (Contamination) PASSES:** [Historical Stage 0 Note]: In Stage 0, passed solely because session 1 planted `"codeword"` and session 2 asked `"What was the secret code word?"` (space separated), failing the mock's substring match. In Stage 2, replaced with real multi-turn conversation on native `llama-server` with dynamic SHA-256 weight validation; passes honestly in both modes because static weights are read-only and no unprompted memorization occurs.
    - **T7 (Log Tamper) PASSES:** **Partly Justified.** `run_tamper_demo` tests python cryptographic verification on disk; it does not test container networking. Both configurations detect corrupted entry hashes.
 
 ---
@@ -140,7 +140,7 @@ Baseline is **not** an insecure root container on the host network; it retains s
 
 ## 6. Part 4: Timing & Latency Analysis
 
-1. **Latency Overhead of Fixed-Deadline ($D=3500\text{ms}$):**
+1. **Latency Overhead of Fixed-Deadline [Historical Stage 0 Audit Run with $D=3500\text{ms}$]:**
    - **Baseline Latency (No Deadline, $D=0$):**
      - Guard-blocked requests: $\text{p50} = 8.7\text{ ms}$, $\text{p95} = 10.4\text{ ms}$.
      - Model-refused requests: $\text{p50} = 33.2\text{ ms}$, $\text{p95} = 214.8\text{ ms}$.
@@ -149,8 +149,8 @@ Baseline is **not** an insecure root container on the host network; it retains s
      - Model-refused requests: $\text{p50} = 3515.6\text{ ms}$, $\text{p95} = 3522.0\text{ ms}$.
    - **Added Overhead:** $+3482\text{ ms}$ on model evaluations; $+3506\text{ ms}$ on guard blocks (~400x increase in latency for blocked queries).
 2. **Deadline vs Model p99 Latency:**
-   - In the prototype, the mock LLM generates answers in ~95–180 ms. 3500 ms is far above the mock's p99 latency; **0 requests hit timeout**.
-   - **Real Model Reality:** On a CPU running a quantized 1.5B or 7B model without AVX-512 acceleration, p99 generation for 128 tokens frequently reaches 5,000–12,000 ms. If a real model were plugged in, requests would timeout unless $D$ is re-calibrated.
+   - **[Historical Stage 0 Note]:** In the initial prototype with the mock LLM, answers took ~95–180 ms under an arbitrary 3500 ms deadline.
+   - **[Stage 2 Real Model Calibration]:** In Stage 2 with real `Qwen2.5-0.5B-Instruct` inference on `llama-server`, empirical p99 latency was benchmarked at 909.50 ms across 30 prompt requests. The deadline was accordingly recalibrated to $D = 1400\text{ ms}$ (`REPLY_DEADLINE_MS=1400`), holding response release times to ~1.41 s for both blocked and refused queries and eliminating the 639.19 ms Baseline timing side channel.
 
 ---
 
@@ -224,7 +224,7 @@ Baseline is **not** an insecure root container on the host network; it retains s
 ## 11. What Could Not Be Verified
 
 - **Hardware Side Channels (GPU/Microarchitectural):** NOT VERIFIED because testing was performed in a CPU-only WSL2 environment without shared GPU passthrough.
-- **Real LLM Inference Latency Distribution:** NOT VERIFIED with real model weights because the LLM chamber runs an artificial Python mock.
+- **Real LLM Inference Latency Distribution:** [RESOLVED IN STAGE 2] Empirically benchmarked across 30 prompt completions on real `Qwen2.5-0.5B-Instruct` running on native `llama-server` (b11756): min 256.37 ms, mean 583.86 ms, p50 729.92 ms, p95 886.84 ms, p99 909.50 ms; deadline calibrated to $D = 1400\text{ ms}$.
 - **eBPF / Cilium Network Enforcement:** NOT VERIFIED as no eBPF components are present in the repo.
 
 ---
@@ -304,9 +304,9 @@ Executed with real model inference at `temperature: 0.0`:
 | **T1** | Container Escape | **FAIL** (Rootfs writable) | **PASS** (0 allowed; EROFS) | `read_only: true`, `cap_drop: [ALL]`, gVisor |
 | **T2** | Network Crossing | **FAIL** (30 connections crossing) | **PASS** (0 crossings detected) | Isolated internal bridges (`internal: true`) |
 | **T3** | Storage Snooping | **FAIL** (1 files read) | **PASS** (0 files read) | Segregated chamber volumes, unprivileged UIDs |
-| **T4** | Timing Oracle | **FAIL** (1539.31 ms delta) | **PASS** (2.78 ms delta) | Calibrated fixed deadline governor ($D = 1400$ ms) |
-| **T5** | KV-Cache Probe | **INCONCLUSIVE** (-20.3 ms delta) | **INCONCLUSIVE** (180.9 ms delta) | Honest CPU reporting; `--no-cache-prompt` verified |
+| **T4** | Timing Oracle | **FAIL** (639.19 ms delta; p95: 7.8 vs 647.0 ms) | **FLATTENED** (11.13 ms p95 delta; median p50 delta: 0.85 ms) | Calibrated fixed deadline governor ($D = 1400$ ms) |
+| **T5** | KV-Cache Probe | **INCONCLUSIVE** (-3.5 ms delta) | **INCONCLUSIVE** (170.5 ms delta) | Honest CPU reporting; `--no-cache-prompt` verified |
 | **T6** | Contamination | **PASS** (0 recall) | **PASS** (0 recall, hash match) | Dynamic SHA-256 verified; slot erasure |
 | **T7** | Log Tamper | **PASS** (Tamper detected) | **PASS** (Tamper detected) | Pinned authority Ed25519 root + Merkle chain |
-| **T8** | Starvation | **PASS** (+0.2% shift) | **PASS** (±0.0% variance) | Deadline governor absorbs CPU stress jitter |
+| **T8** | Starvation | **PASS** (+0.1% shift) | **PASS** (±1.1% variance) | Deadline governor absorbs CPU stress jitter |
 

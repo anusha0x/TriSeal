@@ -2,7 +2,7 @@ SHELL := /bin/bash
 MODE ?= triseal
 CHAMBER_RUNTIME ?= runc
 
-.PHONY: help setup fetch-model fetch-datasets up down ps logs test-baseline test-triseal test-all verify-ledger tamper-demo ui clean control-plane anchor demo
+.PHONY: help setup fetch-model fetch-datasets up down ps logs test-baseline test-triseal test-all verify-ledger verify-evidence tamper-demo ui clean control-plane anchor demo
 
 help:
 	@echo "TriSeal Management Commands:"
@@ -16,6 +16,7 @@ help:
 	@echo "  make test-triseal     - Execute full Leak Test Suite against TriSeal"
 	@echo "  make test-all         - Run tests against both Baseline and TriSeal"
 	@echo "  make verify-ledger    - Cryptographically audit the event ledger"
+	@echo "  make verify-evidence  - Cryptographically audit the static evidence snapshot"
 	@echo "  make tamper-demo      - Demonstrate ledger tamper detection"
 	@echo "  make ui               - Launch the Security-Ops UI"
 
@@ -69,6 +70,9 @@ test-all:
 
 verify-ledger:
 	python3 -m ledger.verifier --ledger-file data/ledger.jsonl --checkpoints data/checkpoints.jsonl --trusted-key ledger/trust/ledger_signing.pub --anchor-file docs/anchors.txt
+
+verify-evidence:
+	python3 -m ledger.verifier --ledger-file evidence/ledger.jsonl --checkpoints evidence/checkpoints.jsonl --trusted-key ledger/trust/ledger_signing.pub --anchor-file docs/anchors.txt
 
 anchor:
 	python3 -m ledger.anchor

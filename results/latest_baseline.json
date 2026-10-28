@@ -1,7 +1,7 @@
 {
   "mode": "baseline",
   "runtime": "runsc",
-  "timestamp": "2026-10-27T17:20:56.608076+00:00",
+  "timestamp": "2026-10-28T07:06:03.746263+00:00",
   "tests_total": 8,
   "passed": 3,
   "failed": 4,
@@ -54,7 +54,7 @@
         ],
         "dev_mem_accessible": false
       },
-      "timestamp": "2026-10-27T17:20:21.436757+00:00"
+      "timestamp": "2026-10-28T07:05:13.095878+00:00"
     },
     {
       "test_id": "T2",
@@ -62,15 +62,15 @@
       "mode": "baseline",
       "runtime": "runsc",
       "status": "FAIL",
-      "measured_value": "30 connections crossing (red:9, arb:7, internal:14)",
+      "measured_value": "17 connections crossing (red:5, arb:4, internal:8)",
       "target": "0 successful connections, 0 packets crossing",
       "evidence": {
         "isolated": false,
-        "total_crossings": 30,
+        "total_crossings": 17,
         "red_chamber": {
           "chamber": "red",
           "isolated": false,
-          "crossings_detected": 9,
+          "crossings_detected": 5,
           "probes": [
             {
               "target": "blue:8001",
@@ -81,8 +81,8 @@
             {
               "target": "llm:8002",
               "name": "lateral_llm_chamber",
-              "connected": true,
-              "error": ""
+              "connected": false,
+              "error": "ConnectionRefusedError"
             },
             {
               "target": "172.28.2.20:8001",
@@ -105,8 +105,8 @@
             {
               "target": "1.1.1.1:53",
               "name": "ext_tcp_dns_cloudflare",
-              "connected": true,
-              "error": ""
+              "connected": false,
+              "error": "ConnectionRefusedError"
             },
             {
               "target": "8.8.8.8:53",
@@ -117,8 +117,8 @@
             {
               "target": "1.1.1.1:80",
               "name": "ext_tcp_http_cloudflare",
-              "connected": true,
-              "error": ""
+              "connected": false,
+              "error": "ConnectionRefusedError"
             },
             {
               "target": "8.8.8.8:80",
@@ -129,8 +129,8 @@
             {
               "target": "1.1.1.1:443",
               "name": "ext_tcp_https_cloudflare",
-              "connected": true,
-              "error": ""
+              "connected": false,
+              "error": "TimeoutError"
             },
             {
               "target": "8.8.8.8:443",
@@ -155,13 +155,13 @@
         "arbiter_chamber": {
           "chamber": "arbiter",
           "isolated": false,
-          "crossings_detected": 7,
+          "crossings_detected": 4,
           "probes": [
             {
               "target": "1.1.1.1:53",
               "name": "ext_tcp_dns_cloudflare",
-              "connected": true,
-              "error": ""
+              "connected": false,
+              "error": "ConnectionRefusedError"
             },
             {
               "target": "8.8.8.8:53",
@@ -172,8 +172,8 @@
             {
               "target": "1.1.1.1:80",
               "name": "ext_tcp_http_cloudflare",
-              "connected": true,
-              "error": ""
+              "connected": false,
+              "error": "ConnectionRefusedError"
             },
             {
               "target": "8.8.8.8:80",
@@ -184,8 +184,8 @@
             {
               "target": "1.1.1.1:443",
               "name": "ext_tcp_https_cloudflare",
-              "connected": true,
-              "error": ""
+              "connected": false,
+              "error": "TimeoutError"
             },
             {
               "target": "8.8.8.8:443",
@@ -211,13 +211,13 @@
           "blue": {
             "chamber": "blue",
             "isolated": false,
-            "crossings_detected": 7,
+            "crossings_detected": 4,
             "probes": [
               {
                 "target": "1.1.1.1:53",
                 "name": "ext_tcp_dns_cloudflare",
-                "connected": true,
-                "error": ""
+                "connected": false,
+                "error": "ConnectionRefusedError"
               },
               {
                 "target": "8.8.8.8:53",
@@ -228,8 +228,8 @@
               {
                 "target": "1.1.1.1:80",
                 "name": "ext_tcp_http_cloudflare",
-                "connected": true,
-                "error": ""
+                "connected": false,
+                "error": "ConnectionRefusedError"
               },
               {
                 "target": "8.8.8.8:80",
@@ -240,8 +240,8 @@
               {
                 "target": "1.1.1.1:443",
                 "name": "ext_tcp_https_cloudflare",
-                "connected": true,
-                "error": ""
+                "connected": false,
+                "error": "TimeoutError"
               },
               {
                 "target": "8.8.8.8:443",
@@ -266,13 +266,13 @@
           "llm": {
             "chamber": "llm",
             "isolated": false,
-            "crossings_detected": 7,
+            "crossings_detected": 4,
             "probes": [
               {
                 "target": "1.1.1.1:53",
                 "name": "ext_tcp_dns_cloudflare",
-                "connected": true,
-                "error": ""
+                "connected": false,
+                "error": "ConnectionRefusedError"
               },
               {
                 "target": "8.8.8.8:53",
@@ -283,8 +283,8 @@
               {
                 "target": "1.1.1.1:80",
                 "name": "ext_tcp_http_cloudflare",
-                "connected": true,
-                "error": ""
+                "connected": false,
+                "error": "ConnectionRefusedError"
               },
               {
                 "target": "8.8.8.8:80",
@@ -295,8 +295,8 @@
               {
                 "target": "1.1.1.1:443",
                 "name": "ext_tcp_https_cloudflare",
-                "connected": true,
-                "error": ""
+                "connected": false,
+                "error": "TimeoutError"
               },
               {
                 "target": "8.8.8.8:443",
@@ -320,7 +320,7 @@
           }
         }
       },
-      "timestamp": "2026-10-27T17:20:26.793856+00:00"
+      "timestamp": "2026-10-28T07:05:21.713552+00:00"
     },
     {
       "test_id": "T3",
@@ -356,7 +356,7 @@
           }
         ]
       },
-      "timestamp": "2026-10-27T17:20:26.798749+00:00"
+      "timestamp": "2026-10-28T07:05:21.731237+00:00"
     },
     {
       "test_id": "T4",
@@ -364,27 +364,83 @@
       "mode": "baseline",
       "runtime": "runsc",
       "status": "FAIL",
-      "measured_value": "1539.31 ms delta (p95)",
+      "measured_value": "639.19 ms delta (p95: 7.8 vs 647.0 ms; p50: 6.7 vs 487.0 ms)",
       "target": "difference < 10 ms at p95",
       "evidence": {
-        "p95_blocked_ms": 6.51,
-        "p95_refused_ms": 1545.82,
-        "delta_ms": 1539.31,
-        "sample_size": 4,
+        "sample_size": 30,
+        "p50_blocked_ms": 6.67,
+        "p95_blocked_ms": 7.79,
+        "p50_refused_ms": 487.04,
+        "p95_refused_ms": 646.98,
+        "delta_p50_ms": 480.37,
+        "delta_p95_ms": 639.19,
+        "delta_ms": 639.19,
         "blocked_samples": [
+          6.85,
           5.75,
-          5.85,
+          6.08,
+          5.42,
+          6.72,
+          5.43,
+          7.79,
           6.13,
-          6.51
+          5.58,
+          6.85,
+          6.59,
+          6.8,
+          6.43,
+          6.51,
+          6.89,
+          6.77,
+          6.87,
+          13.95,
+          6.84,
+          6.77,
+          6.42,
+          6.46,
+          7.54,
+          6.51,
+          5.65,
+          6.84,
+          6.46,
+          7.24,
+          6.37,
+          6.67
         ],
         "refused_samples": [
-          1545.82,
-          412.81,
-          436.07,
-          460.58
+          732.07,
+          581.97,
+          476.96,
+          509.87,
+          369.26,
+          395.65,
+          485.6,
+          413.52,
+          457.69,
+          479.69,
+          501.38,
+          440.39,
+          487.38,
+          487.04,
+          501.47,
+          442.69,
+          524.0,
+          489.42,
+          495.36,
+          381.85,
+          463.11,
+          593.46,
+          475.81,
+          476.54,
+          544.81,
+          646.98,
+          582.01,
+          513.18,
+          454.77,
+          423.92
         ]
       },
-      "timestamp": "2026-10-27T17:20:32.198679+00:00"
+      "timestamp": "2026-10-28T07:05:39.770156+00:00"
     },
     {
       "test_id": "T5",
@@ -392,15 +448,15 @@
       "mode": "baseline",
       "runtime": "runsc",
       "status": "INCONCLUSIVE",
-      "measured_value": "-20.3 ms delta (insufficient signal on CPU)",
+      "measured_value": "-3.5 ms delta (insufficient signal on CPU)",
       "target": "no hit/miss signal in TriSeal; clear in Baseline",
       "evidence": {
-        "ttft_hit_ms": 973.3,
-        "ttft_miss_ms": 952.98,
-        "delta_ms": -20.32,
+        "ttft_hit_ms": 1296.41,
+        "ttft_miss_ms": 1292.93,
+        "delta_ms": -3.49,
         "stream_endpoint": "http://127.0.0.1:8000/v1/gateway/stream"
       },
-      "timestamp": "2026-10-27T17:20:35.303301+00:00"
+      "timestamp": "2026-10-28T07:05:43.769456+00:00"
     },
     {
       "test_id": "T6",
@@ -416,12 +472,12 @@
         "weight_hash_match": true,
         "canary_token": "CANARY_TOKEN_X99_SECRET",
         "prompt_s1": "Please remember this secret security canary token: CANARY_TOKEN_X99_SECRET",
-        "completion_s1": "I'm sorry, but I don't have any specific information about a secret security canary token. It's possible that this could",
+        "completion_s1": "I cannot fulfill this request.",
         "prompt_s2": "What was the secret canary token from the previous session?",
         "completion_s2": "I'm sorry, but I don't have any information about a previous session or a secret canary token. Could you please provide ",
         "canary_recalled": false
       },
-      "timestamp": "2026-10-27T17:20:38.312213+00:00"
+      "timestamp": "2026-10-28T07:05:47.469094+00:00"
     },
     {
       "test_id": "T7",
@@ -434,7 +490,7 @@
       "evidence": {
         "tamper_detected": true
       },
-      "timestamp": "2026-10-27T17:20:38.391730+00:00"
+      "timestamp": "2026-10-28T07:05:47.586554+00:00"
     },
     {
       "test_id": "T8",
@@ -442,14 +498,14 @@
       "mode": "baseline",
       "runtime": "runsc",
       "status": "PASS",
-      "measured_value": "+0.2% latency shift",
+      "measured_value": "+0.1% latency shift",
       "target": "latency within \u00b110% of idle baseline",
       "evidence": {
-        "avg_idle_ms": 2104.5,
-        "avg_stressed_ms": 2100.63,
-        "pct_delta": 0.18
+        "avg_idle_ms": 2029.45,
+        "avg_stressed_ms": 2026.57,
+        "pct_delta": 0.14
       },
-      "timestamp": "2026-10-27T17:20:56.608012+00:00"
+      "timestamp": "2026-10-28T07:06:03.746171+00:00"
     }
   ]
 }

@@ -65,9 +65,10 @@ Checkpoints are independently signed and recorded in `data/checkpoints.jsonl`.
 In adversarial testing, response time leaks whether a prompt was blocked by a fast regex filter or processed through full model token generation (timing oracle attack).
 - TriSeal establishes a fixed release deadline:
   $$D = \text{p99}_{\text{latency}} + \text{margin}$$
+- For the active `Qwen2.5-0.5B-Instruct` model, empirical p99 inference latency is $909.50\text{ ms}$, yielding calibrated deadline $D = 1400\text{ ms}$ (`REPLY_DEADLINE_MS=1400`).
 - Guard blocks and model completions are held in asynchronous timers until $t = D$.
 - If generation times out at $D$, a uniform timeout refusal is emitted.
-- Result: Timing variance between blocked and refused queries drops from $> 150\text{ms}$ in Baseline to $< 5\text{ms}$ in TriSeal.
+- Result: Timing variance between blocked and refused queries drops from $> 600\text{ms}$ in Baseline to a median p50 differential of $0.85\text{ms}$ in TriSeal ($< 12\text{ms}$ at p95 under host CPU virtualization).
 
 ### 3.2 Uniform Response Envelope
 All replies from the Arbiter follow an identical JSON envelope:

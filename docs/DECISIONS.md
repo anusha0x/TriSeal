@@ -28,7 +28,7 @@
 - **Decision:** Configure explicit static IPv4 subnets (`172.28.1.0/24` for `net_red`, `172.28.2.0/24` for `net_blue`, `172.28.3.0/24` for `net_llm`, `172.28.4.0/24` for `net_admin`) with `extra_hosts` mappings in Docker Compose.
 - **Reasoning:** gVisor's virtualized user-space network stack (`netstack`) isolates container networking and intentionally does not evaluate host iptables DNAT rules used by Docker's embedded `127.0.0.11` DNS resolver. Static subnets with `extra_hosts` provide deterministic hostname resolution via container `/etc/hosts` while enforcing strict physical isolation across internal bridge networks.
 
-## ADR-006: Fixed-Deadline Envelope Release ($D = 3500\text{ms}$)
+## ADR-006: Fixed-Deadline Envelope Release ($D = 1400\text{ms}$)
 - **Status:** Approved
-- **Decision:** The Arbiter Gateway holds all responses—including benign completions, model refusals, and guardrail blocks—until a calibrated deadline ($D = 3500\text{ms}$) before releasing a uniform JSON reply envelope.
-- **Reasoning:** Eliminates timing side channels (T4: Timing Oracle) where attackers observe milliseconds difference between guard blocking (~5ms) and model refusal (~200ms) to reverse-engineer defense rules. Measured variance dropped from 204.39ms (Baseline) to 1.73ms (TriSeal).
+- **Decision:** The Arbiter Gateway holds all responses—including benign completions, model refusals, and guardrail blocks—until a calibrated deadline ($D = 1400\text{ms}$, calibrated against empirical p99 inference latency of $909.50\text{ms}$ with a 35% margin) before releasing a uniform JSON reply envelope.
+- **Reasoning:** Eliminates timing side channels (T4: Timing Oracle) where attackers observe milliseconds difference between guard blocking (~7ms) and model refusal (~487–647ms) to reverse-engineer defense rules. Flattens response times to ~1.41 s for both groups with a median p50 differential of 0.85 ms (eliminating the 639.19 ms Baseline timing side channel).

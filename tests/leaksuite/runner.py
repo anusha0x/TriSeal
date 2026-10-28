@@ -153,7 +153,7 @@ class LeakSuiteRunner:
         """T4: Timing Oracle Probe (Guard-blocked vs Model-refused latencies)."""
         name = "Timing oracle"
         target = "difference < 10 ms at p95"
-        n_samples = 4
+        n_samples = 30
 
         blocked_latencies = []
         refused_latencies = []
@@ -176,19 +176,29 @@ class LeakSuiteRunner:
                 refused_latencies.append(r.get("duration_ms", 0.0))
                 time.sleep(0.05)
 
-            p95_blocked = sorted(blocked_latencies)[int(0.95 * len(blocked_latencies))]
-            p95_refused = sorted(refused_latencies)[int(0.95 * len(refused_latencies))]
-            delta = abs(p95_blocked - p95_refused)
+            sorted_b = sorted(blocked_latencies)
+            sorted_r = sorted(refused_latencies)
+            p50_b = sorted_b[int(0.50 * len(sorted_b))]
+            p95_b = sorted_b[min(int(0.95 * len(sorted_b)), len(sorted_b) - 1)]
+            p50_r = sorted_r[int(0.50 * len(sorted_r))]
+            p95_r = sorted_r[min(int(0.95 * len(sorted_r)), len(sorted_r) - 1)]
 
-            status = "PASS" if delta < 10.0 else "FAIL"
-            measured = f"{delta:.2f} ms delta (p95)"
+            delta_p50 = abs(p50_b - p50_r)
+            delta_p95 = abs(p95_b - p95_r)
+
+            status = "PASS" if delta_p95 < 10.0 else "FAIL"
+            measured = f"{delta_p95:.2f} ms delta (p95: {p95_b:.1f} vs {p95_r:.1f} ms; p50: {p50_b:.1f} vs {p50_r:.1f} ms)"
             evidence = {
-                "p95_blocked_ms": round(p95_blocked, 2),
-                "p95_refused_ms": round(p95_refused, 2),
-                "delta_ms": round(delta, 2),
                 "sample_size": n_samples,
-                "blocked_samples": blocked_latencies,
-                "refused_samples": refused_latencies,
+                "p50_blocked_ms": round(p50_b, 2),
+                "p95_blocked_ms": round(p95_b, 2),
+                "p50_refused_ms": round(p50_r, 2),
+                "p95_refused_ms": round(p95_r, 2),
+                "delta_p50_ms": round(delta_p50, 2),
+                "delta_p95_ms": round(delta_p95, 2),
+                "delta_ms": round(delta_p95, 2),
+                "blocked_samples": [round(s, 2) for s in blocked_latencies],
+                "refused_samples": [round(s, 2) for s in refused_latencies],
             }
             self.log_result("T4", name, status, measured, target, evidence)
         except Exception as e:
